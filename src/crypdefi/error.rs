@@ -16,4 +16,10 @@ pub enum BotSdkError {
 
     #[error("There is no refresh token available")]
     NoRefreshToken,
+
+    #[error("Invalid user id")]
+    InvalidUserId,
+
+    #[error("Id is not a user id. User Id starts with 'us'")]
+    IdNotUserId,
 }

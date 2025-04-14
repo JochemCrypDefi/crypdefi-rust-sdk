@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 
 pub fn get_url_base(endpoint: String) -> Result<String, BotSdkError> {
-    let key = "BASE_URL";
+    let key = "CRYPDEFI_API_BASE_URL";
     let base_url = match env::var(key) {
         Ok(val) => val,
         Err(err) => return Err(BotSdkError::EnvVar(err.to_string())),

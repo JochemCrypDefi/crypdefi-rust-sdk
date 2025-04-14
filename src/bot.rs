@@ -11,11 +11,8 @@ V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
     ))
     .unwrap();
 
-    bot.login(
-        String::from("0000000000"),
-        String::from("us-0000000000-fbf17c83804f03af10c6"),
-    )
-    .unwrap();
+    bot.login(String::from("us-0000000000-fbf17c83804f03af10c6"))
+        .unwrap();
 
     let wallets = bot.get_wallets().unwrap();
     println!("wallets: {:?}", wallets);

@@ -47,12 +47,12 @@ impl Bot {
             Err(err) => return Err(BotSdkError::Pkcs8Error(err.to_string())),
         };
 
-        let key = "BASE_URL";
+        let key = "CRYPDEFI_API_BASE_URL";
         let _ = match env::var(key) {
             Ok(val) => val,
             Err(_) => {
                 return Err(BotSdkError::EnvVar(
-                    "BASE_URL enviroment variable is not set.".to_string(),
+                    "CRYPDEFI_API_BASE_URL enviroment variable is not set.".to_string(),
                 ));
             }
         };
@@ -65,9 +65,21 @@ impl Bot {
         }))
     }
 
-    pub fn login(&self, org_id: String, user_id: String) -> Result<(), BotSdkError> {
+    /** logs in to the crypdefi user
+     */
+    pub fn login(&self, user_id: String) -> Result<(), BotSdkError> {
+        let user_iter: Vec<&str> = user_id.split("-").collect();
+
+        if user_iter.len() < 3 {
+            return Err(BotSdkError::InvalidUserId);
+        }
+
+        if user_iter[0] != "us" {
+            return Err(BotSdkError::IdNotUserId);
+        }
+
         let login_req = LoginRequest {
-            organization: org_id,
+            organization: user_iter[1].to_string(),
             user_id: user_id.clone(),
             auth_method: "cra".to_string(),
         };
@@ -101,6 +113,8 @@ impl Bot {
         }());
     }
 
+    /** gets the wallets currently stored in the bot
+     */
     pub fn refresh(&self) -> Result<(), BotSdkError> {
         let rt = Runtime::new().unwrap();
         return rt.block_on(async move || -> Result<(), BotSdkError> {
@@ -121,6 +135,8 @@ impl Bot {
         }());
     }
 
+    /** gets the wallets currently stored in the bot
+     */
     pub fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
         let rt = Runtime::new().unwrap();
         return rt.block_on(async move || -> Result<Vec<Wallet>, BotSdkError> {
@@ -134,6 +150,7 @@ impl Bot {
         }());
     }
 
+    /// send the transaction hex to crypdefi for signging
     pub fn sign_transaction(
         &self,
         wallet_id: String,
