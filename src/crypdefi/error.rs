@@ -22,4 +22,7 @@ pub enum BotSdkError {
 
     #[error("Id is not a user id. User Id starts with 'us'")]
     IdNotUserId,
+
+    #[error("could not encode signature to DER ASN1")]
+    DEREncodeFail(String),
 }

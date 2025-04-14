@@ -187,6 +187,59 @@ pub struct Signature {
     recovery_id: Option<u64>,
 }
 
+impl Signature {
+    pub fn to_der(&self) -> Result<Vec<u8>, BotSdkError> {
+        // Convert hex strings to byte vectors
+        let r_bytes = match hex::decode(&self.r) {
+            Ok(val) => val,
+            Err(err) => return Err(BotSdkError::DEREncodeFail(err.to_string())),
+        };
+
+        let s_bytes = match hex::decode(&self.s) {
+            Ok(val) => val,
+            Err(err) => return Err(BotSdkError::DEREncodeFail(err.to_string())),
+        };
+
+        // Ensure r and s are properly padded or trimmed for DER encoding
+        let r_der = self.encode_integer(&r_bytes);
+        let s_der = self.encode_integer(&s_bytes);
+
+        // Construct the sequence: 0x30 (sequence tag) + length + r_der + s_der
+        let mut der = Vec::new();
+        der.push(0x30); // Sequence tag
+
+        let total_length = r_der.len() + s_der.len();
+        der.push(total_length as u8); // Length of the sequence
+
+        der.extend_from_slice(&r_der);
+        der.extend_from_slice(&s_der);
+
+        Ok(der)
+    }
+
+    fn encode_integer(&self, bytes: &[u8]) -> Vec<u8> {
+        let mut result = Vec::new();
+        result.push(0x02); // Integer tag
+
+        // Remove leading zeros, but ensure at least one byte remains
+        let mut trimmed = bytes;
+        while trimmed.len() > 1 && trimmed[0] == 0 {
+            trimmed = &trimmed[1..];
+        }
+
+        // If the first bit is 1, prepend a 0x00 to avoid interpreting as negative
+        if trimmed[0] & 0x80 != 0 {
+            result.push((trimmed.len() + 1) as u8); // Length includes the extra 0x00
+            result.push(0x00);
+        } else {
+            result.push(trimmed.len() as u8); // Length of the integer
+        }
+
+        result.extend_from_slice(trimmed);
+        result
+    }
+}
+
 #[derive(Deserialize, Debug, Clone, uniffi::Enum, Serialize)]
 pub enum KeyAlgorithm {
     #[serde(rename = "ECDSA_SECP256k1")]
