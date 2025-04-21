@@ -27,6 +27,7 @@ pub struct LoginResponse {
     pub deadline: u32,
 }
 
+/// makes login call to the crypdefi servers
 pub async fn login(req: LoginRequest) -> Result<LoginResponse, BotSdkError> {
     let url = get_url_base("/auth/login".to_string())?;
     let client = Client::new();
@@ -70,6 +71,7 @@ pub struct CraResponse {
     pub refresh_token: String,
 }
 
+/// makes the cra login auth call to servers
 pub async fn cra_login(req: CraRequest) -> Result<CraResponse, BotSdkError> {
     let url = get_url_base("/auth/cra".to_string())?;
     let client = Client::new();
@@ -129,6 +131,7 @@ pub struct Wallet {
     chain: ChainSimple,
 }
 
+/// makes call to get wallets from backend for user.
 pub async fn get_wallets(access_token_arc: &Option<String>) -> Result<Vec<Wallet>, BotSdkError> {
     let access_token = match access_token_arc {
         Some(acc) => acc,
@@ -274,6 +277,7 @@ pub enum SignatureRequestKind {
     EvmEip712,
 }
 
+/// Request signature from keyvault passing hex transactions
 pub async fn sign(
     access_token_arc: &Option<String>,
     wallet_id: String,
@@ -326,6 +330,8 @@ pub async fn sign(
         res
     )));
 }
+
+/// Request signature from keyvault passing hex transactions
 pub async fn logout(access_token_arc: &Option<String>) -> Result<(), BotSdkError> {
     let access_token = match access_token_arc {
         Some(acc) => acc,
@@ -368,6 +374,7 @@ struct RefreshRequest {
     refresh_token: String,
 }
 
+/// Make call to try to refresh the access token
 pub async fn refresh_auth(
     refresh_token_opt: &Option<String>,
     access_token_opt: &Option<String>,

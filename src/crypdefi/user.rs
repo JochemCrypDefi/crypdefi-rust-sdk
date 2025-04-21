@@ -11,12 +11,6 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
 
-#[derive(uniffi::Enum)]
-pub enum Network {
-    Sandbox,
-    Dev,
-}
-
 fn sign_challenge_with_ecdsa(
     signing_key: SigningKey,
     challenge: Vec<u8>,
@@ -30,6 +24,9 @@ fn sign_challenge_with_ecdsa(
     Ok(signature)
 }
 
+/// Bot used signing requests for crypdefi wallets.
+///
+/// # Note: Most of the implemented functions in the bot use the tokio runtime inside it.
 #[derive(Debug, uniffi::Object)]
 pub struct Bot {
     pub wallets: Arc<RwLock<Vec<Wallet>>>,
@@ -41,6 +38,19 @@ pub struct Bot {
 #[uniffi::export]
 impl Bot {
     #[uniffi::constructor]
+    /// constructs a new `Bot`
+    /// You need to have a valid pem encoded private key.
+    ///
+    /// # Example
+    /// ```
+    /// let priv_key =   "-----BEGIN PRIVATE KEY-----
+    /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
+    /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
+    /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
+    /// -----END PRIVATE KEY-----",
+    ///
+    ///let bot = Bot::new(priv_key).unwrap();
+    /// ```
     pub fn new(pem_key: String) -> Result<Arc<Self>, BotSdkError> {
         let signing_key = match SigningKey::from_pkcs8_pem(pem_key.as_str()) {
             Ok(val) => val,
@@ -65,8 +75,22 @@ impl Bot {
         }))
     }
 
-    /** logs in to the crypdefi user
-     */
+    /// logs in to the crypdefi user
+    ///
+    /// # Example
+    /// ```
+    /// let priv_key =   "-----BEGIN PRIVATE KEY-----
+    /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
+    /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
+    /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
+    /// -----END PRIVATE KEY-----",
+    ///
+    /// let bot = Bot::new(priv_key).unwrap();
+    ///
+    /// bot.login(String::from("us-0000000000-fbf17c83704f04af11c6")).unwrap();
+    /// ```
+    ///
+    /// # Note: uses tokio async runtime
     pub fn login(&self, user_id: String) -> Result<(), BotSdkError> {
         let user_iter: Vec<&str> = user_id.split("-").collect();
 
@@ -126,8 +150,21 @@ impl Bot {
         }());
     }
 
-    /** gets the wallets currently stored in the bot
-     */
+    /// Tries to refresh the access_token for the bot.
+    ///
+    /// # Example
+    /// ```
+    /// let priv_key =   "-----BEGIN PRIVATE KEY-----
+    /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
+    /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
+    /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
+    /// -----END PRIVATE KEY-----",
+    ///
+    /// let bot = Bot::new(priv_key).unwrap();
+    /// bot.refresh().unwrap
+    /// ```
+    ///
+    /// # Note: uses tokio async runtime
     pub fn refresh(&self) -> Result<(), BotSdkError> {
         let rt = match Runtime::new() {
             Ok(runtime) => runtime,
@@ -152,8 +189,22 @@ impl Bot {
         }());
     }
 
-    /** gets the wallets currently stored in the bot
-     */
+    /// gets the wallets currently stored in the bot
+    ///
+    /// # Example
+    /// ```
+    /// let priv_key =   "-----BEGIN PRIVATE KEY-----
+    /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
+    /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
+    /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
+    /// -----END PRIVATE KEY-----",
+    ///
+    /// let bot = Bot::new(priv_key).unwrap();
+    /// let wallets = bot.get_wallets().unwrap();
+    /// println!("wallets: {:?}", wallets);
+    /// ```
+    ///
+    /// # Note: uses tokio async runtime
     pub fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
         let rt = match Runtime::new() {
             Ok(runtime) => runtime,
@@ -172,6 +223,25 @@ impl Bot {
     }
 
     /// send the transaction hex to crypdefi for signging
+    ///
+    /// # Example
+    /// ```
+    /// let priv_key =   "-----BEGIN PRIVATE KEY-----
+    /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
+    /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
+    /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
+    /// -----END PRIVATE KEY-----",
+    ///
+    /// let bot = Bot::new(priv_key).unwrap();
+    ///
+    /// let wallet_id = "wa-0000000000-4f45f9d208e9207736fb".to_string();
+    /// let transaction_hex = "02f8af01018390f560850461933067828cb394a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4880b844095ea7b300000000000000000000000097802f38a37e1d789eba194513e3eb7e918d34df000000000000000000000000000000000000000000000000000000001dcd6500c001a0ad0b4a87309ef94b96d38f145d676d971ca1f1e4702c9cace99fdec8df4a8814a008651a171f31629bcf3a686ca26b9d3cece44c6dfec39fb2c1848e3b290ba121".to_string();
+    ///
+    /// let wallets = bot.sign_transaction(wallet_id,crypdefi_bot_sdk::crypdefi::http::SignatureRequestKind::Transaction, transaction_hex).unwrap();
+    /// println!("wallets: {:?}", wallets);
+    /// ```
+    ///
+    /// # Note: uses tokio async runtime
     pub fn sign_transaction(
         &self,
         wallet_id: String,
@@ -191,6 +261,26 @@ impl Bot {
         }());
     }
 
+    /// logs out the user
+    ///
+    /// # Example
+    /// ```
+    /// let priv_key =   "-----BEGIN PRIVATE KEY-----
+    /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
+    /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
+    /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
+    /// -----END PRIVATE KEY-----",
+    ///
+    /// let bot = Bot::new(priv_key).unwrap();
+    ///
+    /// let wallet_id = "wa-0000000000-4f45f9d208e9207736fb".to_string();
+    /// let transaction_hex = "02f8af01018390f560850461933067828cb394a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4880b844095ea7b300000000000000000000000097802f38a37e1d789eba194513e3eb7e918d34df000000000000000000000000000000000000000000000000000000001dcd6500c001a0ad0b4a87309ef94b96d38f145d676d971ca1f1e4702c9cace99fdec8df4a8814a008651a171f31629bcf3a686ca26b9d3cece44c6dfec39fb2c1848e3b290ba121".to_string();
+    ///
+    /// let wallets = bot.sign_transaction(wallet_id,crypdefi_bot_sdk::crypdefi::http::SignatureRequestKind::Transaction, transaction_hex).unwrap();
+    /// println!("wallets: {:?}", wallets);
+    /// ```
+    ///
+    /// # Note: uses tokio async runtime
     pub fn logout(&self) -> Result<(), BotSdkError> {
         let rt = match Runtime::new() {
             Ok(runtime) => runtime,
