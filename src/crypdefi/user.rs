@@ -84,15 +84,28 @@ impl Bot {
             auth_method: "cra".to_string(),
         };
 
-        let rt = Runtime::new().unwrap();
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
         return rt.block_on(async move || -> Result<(), BotSdkError> {
             let response = login(login_req).await?;
 
-            let challenge_bytes = hex::decode(response.challenge.clone()).unwrap();
+            let challenge_bytes = match hex::decode(response.challenge.clone()) {
+                Ok(bytes) => bytes,
+                Err(err) => return Err(BotSdkError::HexError(err.to_string())),
+            };
+
             let signed_challenge =
                 sign_challenge_with_ecdsa(self.private_cert.clone(), challenge_bytes)?;
 
-            let hex_signed_challenge = hex::encode(signed_challenge.to_der().unwrap());
+            let signed_bytes = match signed_challenge.to_der() {
+                Ok(bytes) => bytes,
+                Err(err) => return Err(BotSdkError::DEREncodeFail(err.to_string())),
+            };
+
+            let hex_signed_challenge = hex::encode(signed_bytes);
 
             let login_req = CraRequest {
                 user_id,
@@ -116,7 +129,11 @@ impl Bot {
     /** gets the wallets currently stored in the bot
      */
     pub fn refresh(&self) -> Result<(), BotSdkError> {
-        let rt = Runtime::new().unwrap();
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
         return rt.block_on(async move || -> Result<(), BotSdkError> {
             let access_lock = self.access_token.read().await;
             let refresh_lock = self.refresh_token.read().await;
@@ -138,7 +155,11 @@ impl Bot {
     /** gets the wallets currently stored in the bot
      */
     pub fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
-        let rt = Runtime::new().unwrap();
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
         return rt.block_on(async move || -> Result<Vec<Wallet>, BotSdkError> {
             let access_lock = self.access_token.read().await;
             let wallets = get_wallets(&*access_lock).await?;
@@ -157,7 +178,11 @@ impl Bot {
         tx_type: SignatureRequestKind,
         hex_value: String,
     ) -> Result<SigResponse, BotSdkError> {
-        let rt = Runtime::new().unwrap();
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
         return rt.block_on(async move || -> Result<SigResponse, BotSdkError> {
             let access_lock = self.access_token.read().await;
             let signature = sign(&*access_lock, wallet_id, tx_type, hex_value).await?;
@@ -167,7 +192,11 @@ impl Bot {
     }
 
     pub fn logout(&self) -> Result<(), BotSdkError> {
-        let rt = Runtime::new().unwrap();
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
         return rt.block_on(async move || -> Result<(), BotSdkError> {
             let access_lock = self.access_token.read().await;
             let res = logout(&*access_lock).await?;

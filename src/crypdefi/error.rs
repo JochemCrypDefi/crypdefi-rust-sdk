@@ -25,4 +25,10 @@ pub enum BotSdkError {
 
     #[error("could not encode signature to DER ASN1")]
     DEREncodeFail(String),
+
+    #[error("Something happened using the tokio runtime")]
+    TokioError(String),
+
+    #[error("Could not parse hex value")]
+    HexError(String),
 }
