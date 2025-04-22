@@ -6,7 +6,6 @@ use super::{
 use p256::ecdsa::{DerSignature, SigningKey, signature::Signer};
 use p256::ecdsa::{VerifyingKey, signature::Verifier};
 use pkcs8::{DecodePrivateKey, der::Encode};
-use std::env;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
@@ -55,16 +54,6 @@ impl Bot {
         let signing_key = match SigningKey::from_pkcs8_pem(pem_key.as_str()) {
             Ok(val) => val,
             Err(err) => return Err(BotSdkError::Pkcs8Error(err.to_string())),
-        };
-
-        let key = "CRYPDEFI_API_BASE_URL";
-        let _ = match env::var(key) {
-            Ok(val) => val,
-            Err(_) => {
-                return Err(BotSdkError::EnvVar(
-                    "CRYPDEFI_API_BASE_URL enviroment variable is not set.".to_string(),
-                ));
-            }
         };
 
         Ok(Arc::new(Self {

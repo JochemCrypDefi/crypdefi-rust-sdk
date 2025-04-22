@@ -3,16 +3,17 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
 
-pub fn get_url_base(endpoint: String) -> Result<String, BotSdkError> {
+pub const DEFAULT_URL: &str = "https://api.release.crypdefi.eu";
+pub fn get_url_base(endpoint: String) -> String {
     let key = "CRYPDEFI_API_BASE_URL";
     let base_url = match env::var(key) {
         Ok(val) => val,
-        Err(err) => return Err(BotSdkError::EnvVar(err.to_string())),
+        Err(_) => DEFAULT_URL.to_string(),
     };
 
     let joinded_url: String = format!("{}{}", base_url, endpoint);
 
-    return Ok(joinded_url);
+    return joinded_url;
 }
 
 #[derive(Serialize)]
@@ -29,7 +30,7 @@ pub struct LoginResponse {
 
 /// makes login call to the crypdefi servers
 pub async fn login(req: LoginRequest) -> Result<LoginResponse, BotSdkError> {
-    let url = get_url_base("/auth/login".to_string())?;
+    let url = get_url_base("/auth/login".to_string());
     let client = Client::new();
     let response = match client.post(url).json(&req).send().await {
         Ok(res) => res,
@@ -73,7 +74,7 @@ pub struct CraResponse {
 
 /// makes the cra login auth call to servers
 pub async fn cra_login(req: CraRequest) -> Result<CraResponse, BotSdkError> {
-    let url = get_url_base("/auth/cra".to_string())?;
+    let url = get_url_base("/auth/cra".to_string());
     let client = Client::new();
 
     let response = match client.post(url).json(&req).send().await {
@@ -138,7 +139,7 @@ pub async fn get_wallets(access_token_arc: &Option<String>) -> Result<Vec<Wallet
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = get_url_base("/wallets?accessOnly=true".to_string())?;
+    let url = get_url_base("/wallets?accessOnly=true".to_string());
 
     let client = Client::new();
 
@@ -289,7 +290,7 @@ pub async fn sign(
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = get_url_base(format!("/wallets/{}/sign", wallet_id))?;
+    let url = get_url_base(format!("/wallets/{}/sign", wallet_id));
 
     let client = Client::new();
 
@@ -338,7 +339,7 @@ pub async fn logout(access_token_arc: &Option<String>) -> Result<(), BotSdkError
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = get_url_base("/auth/logout".to_string())?;
+    let url = get_url_base("/auth/logout".to_string());
 
     let client = Client::new();
 
@@ -388,7 +389,7 @@ pub async fn refresh_auth(
         None => return Err(BotSdkError::NoRefreshToken),
     };
 
-    let url = get_url_base("/auth/refresh".to_string())?;
+    let url = get_url_base("/auth/refresh".to_string());
 
     let client = Client::new();
 
