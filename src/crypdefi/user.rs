@@ -16,7 +16,7 @@ fn sign_challenge_with_ecdsa(
 ) -> Result<DerSignature, BotSdkError> {
     // Sign the challenge
     let signature: DerSignature = signing_key.sign(&challenge);
-    let verifying_key = VerifyingKey::from(&signing_key); // Serialize with `::to_encoded_point()`
+    let verifying_key = VerifyingKey::from(&signing_key);
     assert!(verifying_key.verify(&challenge, &signature).is_ok());
 
     // Convert the signature to bytes
