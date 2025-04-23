@@ -3,9 +3,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
 
-pub const DEFAULT_URL: &str = "https://api.release.crypdefi.eu";
+pub const DEFAULT_URL: &str = "https://api.prod.crypdefi.eu";
 pub fn get_url_base(endpoint: String) -> String {
-    let key = "CRYPDEFI_API_BASE_URL";
+    let key = "CRYPDEFI_BASE_URL";
     let base_url = match env::var(key) {
         Ok(val) => val,
         Err(_) => DEFAULT_URL.to_string(),
