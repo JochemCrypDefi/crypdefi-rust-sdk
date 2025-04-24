@@ -5,20 +5,46 @@ include:
     inputs:
       read_version: $(grep '"version":' deno.json | awk -F'"' '{print $4}')
 
-  - project: crypdefi/pipelinetemplates
-    file: validate/.check-rust-cargo.yml
 
-  # BUILD
-  - project: crypdefi/pipelinetemplates
-    file: deploy/.build-rust-cargo.yml
-    rules:
-      - if: $CI_COMMIT_BRANCH =~ /^(sandbox|dev|kr|release.*|main)$/ || $CI_PIPELINE_SOURCE == 'merge_request_event'
-    
-  # DEPLOY
 
 stages:
   - validate
   - build
+
+cargo-check:
+  stage: validate
+  image: rust:latest
+  script:
+    - cargo check
+
+cargo-build-release:
+  stage: build
+  image: rust:latest
+  script:
+    - cargo build --release
+
+uniffi_python_binding:
+  stage: build
+  image: rust:latest
+  script:
+    - cargo run --bin uniffi-bindgen generate --library target/release/libcrypdefi_bot_sdk.so --language python --out-dir python-sdk
+  needs: ["cargo-build-release"]
+  artifacts:
+    paths:
+      - python-sdk/
+
+go_binding:
+  stage: build
+  image: rust:latest
+  before_script:
+    # Install uniffi-bindgen-go if not already in your image
+    - cargo install uniffi-bindgen-go
+  script:
+    - uniffi-bindgen-go --library target/release/libcrypdefi_bot_sdk.so --out-dir go-sdk
+  needs: ["cargo-build-release"]
+  artifacts:
+    paths:
+      - go-sdk/
 
 cache:
   key: "merge-requests/$CI_MERGE_REQUEST_IID"
