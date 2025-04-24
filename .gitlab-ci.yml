@@ -3,7 +3,7 @@ include:
   - project: crypdefi/pipelinetemplates
     file: validate/.check-version-pre-merge.yml
     inputs:
-      read_version: $(grep -m 1 '^version\s*=' Cargo.toml | awk -F'"' '{print $4}')
+      read_version: $(grep -m 1 '^version\s*=' Cargo.toml | awk -F'"' '{print $2}')
 
 stages:
   - validate
