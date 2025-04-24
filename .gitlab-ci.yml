@@ -36,7 +36,7 @@ uniffi_python_binding:
     paths:
       - python-sdk/
 
-go_binding:
+uniffi_go_binding:
   stage: build
   image: rust:latest
   before_script:
