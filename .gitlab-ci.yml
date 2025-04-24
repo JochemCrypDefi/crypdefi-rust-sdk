@@ -1,11 +1,9 @@
 include:
   # VALIDATE
-  # - project: crypdefi/pipelinetemplates
-  #   file: validate/.check-version-pre-merge.yml
-  #   inputs:
-  #     read_version: $(grep 'version =' Cargo.toml | awk -F'"' '{print $4}')
-
-
+  - project: crypdefi/pipelinetemplates
+    file: validate/.check-version-pre-merge.yml
+    inputs:
+      read_version: $(grep -m 1 '^version\s*=' Cargo.toml | awk -F'"' '{print $4}')
 
 stages:
   - validate
