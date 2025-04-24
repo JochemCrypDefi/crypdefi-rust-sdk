@@ -1,0 +1,59 @@
+include:
+  # VALIDATE
+  - project: crypdefi/pipelinetemplates
+    file: validate/.check-version-pre-merge.yml
+    inputs:
+      read_version: $(grep -m 1 '^version\s*=' Cargo.toml | awk -F'"' '{print $2}')
+
+stages:
+  - validate
+  - build
+
+cargo-check:
+  stage: validate
+  image: rust:latest
+  script:
+    - cargo check
+
+cargo-build-release:
+  stage: build
+  image: rust:latest
+  script:
+    - cargo build --release
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^(main)$/
+
+
+uniffi_python_binding:
+  stage: build
+  image: rust:latest
+  script:
+    - cargo run --bin uniffi-bindgen generate --library target/release/libcrypdefi_bot_sdk.so --language python --out-dir python-sdk
+  needs: ["cargo-build-release"]
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^(main)$/
+  artifacts:
+    paths:
+      - python-sdk/
+
+uniffi_go_binding:
+  stage: build
+  image: rust:latest
+  before_script:
+    # Install uniffi-bindgen-go if not already in your image
+    - cargo install uniffi-bindgen-go
+  script:
+    - uniffi-bindgen-go --library target/release/libcrypdefi_bot_sdk.so --out-dir go-sdk
+  needs: ["cargo-build-release"]
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^(main)$/
+  artifacts:
+    paths:
+      - go-sdk/
+
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - target/
+    - .cargo/registry/
+    - .cargo/git/
