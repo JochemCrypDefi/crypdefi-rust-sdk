@@ -47,8 +47,8 @@ go_binding:
       - go-sdk/
 
 cache:
-  key: "merge-requests/$CI_MERGE_REQUEST_IID"
+  key: "${CI_COMMIT_REF_SLUG}"
   paths:
     - target/
-    - /root/.cargo/registry/
-    - /root/.cargo/git/
+    - .cargo/registry/
+    - .cargo/git/
