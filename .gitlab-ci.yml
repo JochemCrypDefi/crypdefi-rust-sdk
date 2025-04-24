@@ -22,6 +22,9 @@ cargo-build-release:
   image: rust:latest
   script:
     - cargo build --release
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^(main)$/
+
 
 uniffi_python_binding:
   stage: build
@@ -29,6 +32,8 @@ uniffi_python_binding:
   script:
     - cargo run --bin uniffi-bindgen generate --library target/release/libcrypdefi_bot_sdk.so --language python --out-dir python-sdk
   needs: ["cargo-build-release"]
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^(main)$/
   artifacts:
     paths:
       - python-sdk/
@@ -42,6 +47,8 @@ go_binding:
   script:
     - uniffi-bindgen-go --library target/release/libcrypdefi_bot_sdk.so --out-dir go-sdk
   needs: ["cargo-build-release"]
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^(main)$/
   artifacts:
     paths:
       - go-sdk/
