@@ -1,0 +1,28 @@
+include:
+  # VALIDATE
+  - project: crypdefi/pipelinetemplates
+    file: validate/.check-version-pre-merge.yml
+    inputs:
+      read_version: $(grep '"version":' deno.json | awk -F'"' '{print $4}')
+
+  - project: crypdefi/pipelinetemplates
+    file: validate/.check-rust-cargo.yml
+
+  # BUILD
+  - project: crypdefi/pipelinetemplates
+    file: deploy/.build-rust-cargo.yml
+    rules:
+      - if: $CI_COMMIT_BRANCH =~ /^(sandbox|dev|kr|release.*|main)$/ || $CI_PIPELINE_SOURCE == 'merge_request_event'
+    
+  # DEPLOY
+
+stages:
+  - validate
+  - build
+
+cache:
+  key: "merge-requests/$CI_MERGE_REQUEST_IID"
+  paths:
+    - target/
+    - /root/.cargo/registry/
+    - /root/.cargo/git/
