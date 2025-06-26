@@ -32,4 +32,7 @@ pub enum BotSdkError {
 
     #[error("Could not parse hex value")]
     HexError(String),
+
+    #[error("Custom error")]
+    Custom(String),
 }
