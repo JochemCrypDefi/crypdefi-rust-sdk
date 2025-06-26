@@ -1,7 +1,26 @@
 # Rust Bot SDK
 
 
-This library is used for generating bindings to other languages.
+Bot traders interact with the CrypDefi backend via API calls. To simplify
+authentication and transaction signing, the Bot SDK can be used instead
+of manually managing individual API requests.
+
+This rust library is also used for making bindings in the Go and Python languages.
+
+## Create keys for the Bot login.
+
+### Generate Bot's private key.
+
+```bash
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out private_key_pkcs8.pem
+```
+
+### Generate Bot's Public key
+
+```bash
+openssl pkey -in private_key_pkcs8.pem -pubout -out public_key.pem
+```
+
 
 
 ## build python 
@@ -29,4 +48,5 @@ scp target/release/libcrypdefi_bot_sdk.so go-sdk/crypdefi_bot_sdk
 Run: 
 
 ```
+cargo run --bin crypdefi-bot
 ```
