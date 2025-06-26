@@ -41,6 +41,8 @@ pub struct Bot {
     refresh_handle: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
     refresh_cancel_sender: Arc<watch::Sender<bool>>,
     refresh_cancel_receiver: watch::Receiver<bool>,
+    /// unix timestamp on when the token expires
+    refresh_expiration_time: Arc<RwLock<Option<u64>>>,
 }
 
 #[uniffi::export]
@@ -77,6 +79,7 @@ impl Bot {
             refresh_handle: Arc::new(RwLock::new(None)),
             refresh_cancel_sender: Arc::new(cancel_tx),
             refresh_cancel_receiver: cancel_rx,
+            refresh_expiration_time: Arc::new(RwLock::new(None)),
         }))
     }
 
@@ -92,6 +95,7 @@ impl Bot {
     ///
     /// let bot = Bot::new(priv_key).unwrap();
     ///
+    /// NOTE: By default the bot will auto_refresh login
     /// bot.login(String::from("us-0000000000-fbf17c83704f04af11c6"), None).unwrap();
     /// ```
     ///
@@ -163,11 +167,15 @@ impl Bot {
             *refresh_lock = Some(cra_response.refresh_token);
             drop(refresh_lock);
 
+            let mut refresh_time_lock = self.refresh_expiration_time.write().await;
+            *refresh_time_lock = Some(cra_response.expires_at);
+            drop(refresh_time_lock);
+
             // Start refresh task if auto_refresh is enabled
             let auto_refresh_enabled = self.auto_refresh_enabled.read().await;
             if *auto_refresh_enabled {
                 drop(auto_refresh_enabled);
-                self.start_refresh_task(cra_response.seconds).await?;
+                self.start_refresh_task(cra_response.seconds - 10).await?;
             }
 
             Ok(())
@@ -204,6 +212,10 @@ impl Bot {
             let mut refresh_lock = self.refresh_token.write().await;
             *refresh_lock = Some(response.refresh_token);
 
+            let mut refresh_time_lock = self.refresh_expiration_time.write().await;
+            *refresh_time_lock = Some(response.expires_at);
+            drop(refresh_time_lock);
+
             // if autorefresh is true we restart the watcher thread.
             let auto_refresh_enabled = self.auto_refresh_enabled.read().await;
             if *auto_refresh_enabled {
@@ -214,7 +226,7 @@ impl Bot {
                     .send(true)
                     .map_err(|_| BotSdkError::Custom("Failed to send cancel signal".to_string()))?;
 
-                self.start_refresh_task(response.seconds).await?;
+                self.start_refresh_task(response.seconds - 10).await?;
             }
 
             return Ok(());
@@ -305,6 +317,7 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub fn logout(&self) -> Result<(), BotSdkError> {
         return RUNTIME.block_on(async move || -> Result<(), BotSdkError> {
+            self.cancel_refresh_task().await;
             let access_lock = self.access_token.read().await;
             let res = logout(&*access_lock).await?;
             drop(access_lock);
@@ -313,6 +326,8 @@ impl Bot {
 
             let mut refresh_lock = self.refresh_token.write().await;
             *refresh_lock = None;
+            let mut expiration = self.refresh_expiration_time.write().await;
+            *expiration = None;
 
             return Ok(res);
         }());
@@ -380,5 +395,9 @@ impl Bot {
         if let Some(handle) = handle_lock.take() {
             let _ = handle.await;
         }
+    }
+    pub async fn auth_expiration_unix_time(&self) -> Option<u64> {
+        let expiration = self.refresh_expiration_time.read().await;
+        return *expiration;
     }
 }

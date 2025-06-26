@@ -1,3 +1,5 @@
+use std::{thread::sleep, time};
+
 use crypdefi_bot_sdk::crypdefi::{SignatureRequestKind, error::BotSdkError, user::Bot};
 
 fn main() -> Result<(), BotSdkError> {
@@ -10,7 +12,7 @@ HThQDWWDPkkZ8RM6DFGHu+UpFKGgQ+u33huXc4n0xb3WYIygPMf4SkUh
     ))
     .unwrap();
 
-    print!("loginging");
+    println!("loginging");
     bot.login(
         String::from("us-0000000000-691dc9136b45c44f621f"),
         Option::Some(true),
