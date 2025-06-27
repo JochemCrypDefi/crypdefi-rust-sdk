@@ -1,5 +1,3 @@
-use std::{thread::sleep, time};
-
 use crypdefi_bot_sdk::crypdefi::{SignatureRequestKind, error::BotSdkError, user::Bot};
 
 fn main() -> Result<(), BotSdkError> {
