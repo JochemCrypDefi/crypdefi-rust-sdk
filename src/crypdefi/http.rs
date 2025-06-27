@@ -22,10 +22,10 @@ pub struct LoginRequest {
     pub user_id: String,
     pub auth_method: String,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct LoginResponse {
     pub challenge: String,
-    pub deadline: u32,
+    pub deadline: usize,
 }
 
 /// makes login call to the crypdefi servers
@@ -37,7 +37,12 @@ pub async fn login(req: LoginRequest) -> Result<LoginResponse, BotSdkError> {
         Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
     };
     if response.status().is_success() {
-        let res: LoginResponse = match response.json().await {
+        let text = match response.text().await {
+            Ok(res) => res,
+            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        };
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let res = match serde_json::from_value::<LoginResponse>(v) {
             Ok(res) => res,
             Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
         };
@@ -66,10 +71,12 @@ pub struct CraRequest {
     pub hash_algorithm: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct CraResponse {
     pub token: String,
     pub refresh_token: String,
+    pub expires_at: u64,
+    pub seconds: u64,
 }
 
 /// makes the cra login auth call to servers
@@ -82,7 +89,12 @@ pub async fn cra_login(req: CraRequest) -> Result<CraResponse, BotSdkError> {
         Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
     };
     if response.status().is_success() {
-        let res: CraResponse = match response.json().await {
+        let text = match response.text().await {
+            Ok(res) => res,
+            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        };
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let res = match serde_json::from_value::<CraResponse>(v) {
             Ok(res) => res,
             Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
         };
@@ -154,7 +166,12 @@ pub async fn get_wallets(access_token_arc: &Option<String>) -> Result<Vec<Wallet
     };
 
     if response.status().is_success() {
-        let res: Vec<Wallet> = match response.json().await {
+        let text = match response.text().await {
+            Ok(res) => res,
+            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        };
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let res = match serde_json::from_value::<Vec<Wallet>>(v) {
             Ok(res) => res,
             Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
         };
@@ -311,7 +328,12 @@ pub async fn sign(
         Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
     };
     if response.status().is_success() {
-        let res: SigResponse = match response.json().await {
+        let text = match response.text().await {
+            Ok(res) => res,
+            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        };
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let res = match serde_json::from_value::<SigResponse>(v) {
             Ok(res) => res,
             Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
         };
@@ -408,7 +430,12 @@ pub async fn refresh_auth(
         Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
     };
     if response.status().is_success() {
-        let res: CraResponse = match response.json().await {
+        let text = match response.text().await {
+            Ok(res) => res,
+            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        };
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let res = match serde_json::from_value::<CraResponse>(v) {
             Ok(res) => res,
             Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
         };
