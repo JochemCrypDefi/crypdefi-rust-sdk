@@ -2,6 +2,10 @@
 name = "bot-sdk"
 version = "0.1.0"
 edition = "2024"
+excluse = [
+    "python-sdk",
+    "go-sdk",
+]
 
 [dependencies]
 p256 = "0.13.2"
