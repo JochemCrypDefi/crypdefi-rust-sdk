@@ -8,6 +8,7 @@ excluse = [
 ]
 description="SDK for using BOTs with the crypdefi backend"
 license="MIT + CC"
+license-file = "LICENSE"
 
 [dependencies]
 p256 = "0.13.2"
