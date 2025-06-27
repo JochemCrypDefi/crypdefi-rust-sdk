@@ -1,11 +1,13 @@
 [package]
-name = "bot-sdk"
+name = "crypdefi-bot-sdk"
 version = "0.1.0"
 edition = "2024"
 excluse = [
     "python-sdk",
     "go-sdk",
 ]
+description="SDK for using BOTs with the crypdefi backend"
+License="MIT + CC"
 
 [dependencies]
 p256 = "0.13.2"
