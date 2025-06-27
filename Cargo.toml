@@ -7,7 +7,7 @@ excluse = [
     "go-sdk",
 ]
 description="SDK for using BOTs with the crypdefi backend"
-License="MIT + CC"
+license="MIT + CC"
 
 [dependencies]
 p256 = "0.13.2"
