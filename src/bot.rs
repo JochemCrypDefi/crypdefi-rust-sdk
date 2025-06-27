@@ -26,6 +26,10 @@ HThQDWWDPkkZ8RM6DFGHu+UpFKGgQ+u33huXc4n0xb3WYIygPMf4SkUh
     let result = bot.refresh().unwrap();
     println!("refresh result: {:?}", result);
 
+    let expiration = bot.auth_expiration_unix_time();
+
+    println!("expiration: {:?}", expiration);
+
     let result = bot.logout().unwrap();
     println!("logout result: {:?}", result);
 

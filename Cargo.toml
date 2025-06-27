@@ -2,7 +2,7 @@
 name = "crypdefi-bot-sdk"
 version = "0.1.0"
 edition = "2024"
-excluse = [
+exclude = [
     "python-sdk",
     "go-sdk",
 ]

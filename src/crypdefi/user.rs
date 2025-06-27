@@ -153,11 +153,6 @@ impl Bot {
 
             let cra_response = cra_login(login_req).await?;
 
-            // let seconds: u64 = match cra_response.seconds.parse() {
-            //     Ok(num) => num,
-            //     Err(err) => return Err(BotSdkError::Custom(err.to_string())),
-            // };
-
             // Store tokens
             let mut access_lock = self.access_token.write().await;
             *access_lock = Some(cra_response.token);
@@ -340,8 +335,9 @@ impl Bot {
             .map_err(|_| BotSdkError::Custom("Failed to reset cancel signal".to_string()))?;
 
         let auto_refresh_enabled = Arc::clone(&self.auto_refresh_enabled);
-        let access_token = Arc::clone(&self.access_token); // Use Arc::clone
+        let access_token = Arc::clone(&self.access_token);
         let refresh_token = Arc::clone(&self.refresh_token);
+        let refresh_expiration_time = Arc::clone(&self.refresh_expiration_time);
         let mut cancel_receiver = self.refresh_cancel_receiver.clone();
 
         let handle = RUNTIME.spawn(async move {
@@ -356,17 +352,22 @@ impl Bot {
 
                         let access_lock = access_token.read().await;
                         let refresh_lock = refresh_token.read().await;
+                        let expiration_time_lock = refresh_expiration_time.read().await;
 
                         match refresh_auth(&refresh_lock, &access_lock).await {
                             Ok(response) => {
                                 drop(access_lock);
                                 drop(refresh_lock);
+                                drop(expiration_time_lock);
 
                                 let mut access_lock = access_token.write().await;
                                 *access_lock = Some(response.token);
 
                                 let mut refresh_lock = refresh_token.write().await;
                                 *refresh_lock = Some(response.refresh_token);
+
+                                let mut refresh_expiration_lock = refresh_expiration_time.write().await;
+                                *refresh_expiration_lock = Some(response.expires_at);
                             }
                             Err(e) => {
                                 eprintln!("Failed to refresh token: {:?}", e);
@@ -396,8 +397,11 @@ impl Bot {
             let _ = handle.await;
         }
     }
-    pub async fn auth_expiration_unix_time(&self) -> Option<u64> {
-        let expiration = self.refresh_expiration_time.read().await;
-        return *expiration;
+
+    pub fn auth_expiration_unix_time(&self) -> Option<u64> {
+        return RUNTIME.block_on(async move || -> Option<u64> {
+            let expiration = self.refresh_expiration_time.read().await;
+            return *expiration;
+        }());
     }
 }
