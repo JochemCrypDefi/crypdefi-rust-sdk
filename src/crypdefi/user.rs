@@ -24,9 +24,6 @@ fn sign_challenge_with_ecdsa(
     Ok(signature)
 }
 
-static RUNTIME: std::sync::LazyLock<Runtime> =
-    std::sync::LazyLock::new(|| Runtime::new().expect("Failed to create Tokio runtime"));
-
 /// Bot used signing requests for crypdefi wallets.
 ///
 /// # Note: Most of the implemented functions in the bot use the tokio runtime inside it.
@@ -117,7 +114,12 @@ impl Bot {
             auth_method: "cra".to_string(),
         };
 
-        return RUNTIME.block_on(async move || -> Result<(), BotSdkError> {
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
+        return rt.block_on(async move || -> Result<(), BotSdkError> {
             // Cancel any existing refresh task
             self.cancel_refresh_task().await;
 
@@ -193,7 +195,12 @@ impl Bot {
     ///
     /// # Note: uses tokio async runtime
     pub fn refresh(&self) -> Result<(), BotSdkError> {
-        return RUNTIME.block_on(async move || -> Result<(), BotSdkError> {
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
+        return rt.block_on(async move || -> Result<(), BotSdkError> {
             let access_lock = self.access_token.read().await;
             let refresh_lock = self.refresh_token.read().await;
             let response = refresh_auth(&refresh_lock, &access_lock).await?;
@@ -245,7 +252,12 @@ impl Bot {
     ///
     /// # Note: uses tokio async runtime
     pub fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
-        return RUNTIME.block_on(async move || -> Result<Vec<Wallet>, BotSdkError> {
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
+        return rt.block_on(async move || -> Result<Vec<Wallet>, BotSdkError> {
             let access_lock = self.access_token.read().await;
             let wallets = get_wallets(&*access_lock).await?;
 
@@ -282,7 +294,12 @@ impl Bot {
         tx_type: SignatureRequestKind,
         hex_value: String,
     ) -> Result<SigResponse, BotSdkError> {
-        return RUNTIME.block_on(async move || -> Result<SigResponse, BotSdkError> {
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
+        return rt.block_on(async move || -> Result<SigResponse, BotSdkError> {
             let access_lock = self.access_token.read().await;
             let signature = sign(&*access_lock, wallet_id, tx_type, hex_value).await?;
 
@@ -311,7 +328,12 @@ impl Bot {
     ///
     /// # Note: uses tokio async runtime
     pub fn logout(&self) -> Result<(), BotSdkError> {
-        return RUNTIME.block_on(async move || -> Result<(), BotSdkError> {
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
+        return rt.block_on(async move || -> Result<(), BotSdkError> {
             self.cancel_refresh_task().await;
             let access_lock = self.access_token.read().await;
             let res = logout(&*access_lock).await?;
@@ -340,7 +362,7 @@ impl Bot {
         let refresh_expiration_time = Arc::clone(&self.refresh_expiration_time);
         let mut cancel_receiver = self.refresh_cancel_receiver.clone();
 
-        let handle = RUNTIME.spawn(async move {
+        let handle = tokio::spawn(async move {
             loop {
                 tokio::select! {
                     _ = tokio::time::sleep(Duration::from_secs(seconds)) => {
@@ -399,7 +421,12 @@ impl Bot {
     }
 
     pub fn auth_expiration_unix_time(&self) -> Option<u64> {
-        return RUNTIME.block_on(async move || -> Option<u64> {
+        let rt = match Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        };
+
+        return rt.block_on(async move || -> Option<u64> {
             let expiration = self.refresh_expiration_time.read().await;
             return *expiration;
         }());
