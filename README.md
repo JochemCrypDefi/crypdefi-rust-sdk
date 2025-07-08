@@ -49,8 +49,8 @@ println!("Logging in with Bot...");
 // if you turn off auto_refresh the bot will not automatically re-authenticate itself when its login-token is about to expire
 bot.login(
     user_id.to_string(),
-    Some(false).await
-).unwrap();
+    Some(false)
+).await.unwrap();
  
 // --------------------------- Check for expiration time of AUTH ---------------------------
 let expiration = bot.auth_expiration_unix_time().await;
@@ -86,8 +86,8 @@ println!("Logout result: {:?}", logout_result);
 ```
 
 ## DEVELOPMENT
-This are commands and tools for developers of the SDK.
 
+This are commands and tools for developers of the SDK.
 
 You will need to have the static library somewhere in the file system.
 
