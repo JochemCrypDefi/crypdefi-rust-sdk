@@ -7,13 +7,13 @@ of manually managing individual API requests.
 
 ## Create keys for the Bot login.
 
-### Generate Bot's private key.
+### Generate Bot's private key
 
 ```bash
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out private_key_pkcs8.pem
 ```
 
-### Generate Bot's public key.
+### Generate Bot's public key
 
 ```bash
 openssl pkey -in private_key_pkcs8.pem -pubout -out public_key.pem
@@ -22,24 +22,21 @@ openssl pkey -in private_key_pkcs8.pem -pubout -out public_key.pem
 ## Examples
 
 ```rust
-use crypdefi_bot_sdk::user::Bot;
-use crypdefi_bot_sdk::http::SignatureRequestKind;
+// --------------------------- IMPORT ---------------------------
+use crypdefi_bot_sdk::crypdefi::user::Bot;
+use crypdefi_bot_sdk::crypdefi::SignatureRequestKind;
 use std::fs;
 
 // --------------------------- CONFIG ---------------------------
-// Replace with one of your bot's wallet_id.
-const user_id = "us-0000000000-691dc9136b45c44f621f"; 
+// Replace with your bot's user_id.
+let user_id = "us-0000000000-94518ea57547afd340c3";
 // Replace with the wallet_id of the wallet you want to trade with.
-const wallet_id = "wa-0000000000-93cbea463ddfa0afc3a3"; 
+let wallet_id = "wa-0000000000-9f3542a65690ff697b85"; 
 // This is the bot's private key used to authenticate with CrypDefi (not the wallet's private key).
-const private_key_pem: &str = "-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgT/x59Xqj/UnxmiO0
-VfdMlG3IA6EhXb0a3TePDvWw6RqhRANCAAQfPDagIdi3luh8HaOBihcKqgaCsYsU
-6hpCDdXZruL5+EnOhscqQQqRhJ0zIeCeIBR6oTHOFhVVkzE6Dw9JeArx
------END PRIVATE KEY-----"; 
-
+let private_key_pem = fs::read_to_string("private_key_pkcs8.pem").expect("Failed to read private_key_pkcs8.pem");
 
 // NOTE: If you want to change the backend endpoint you will need to set the env variable: CRYPDEFI_BASE_URL
+
 // --------------------------- INIT BOT ---------------------------
 println!("Initializing Bot...\n");
 let bot = Bot::new(String::from(private_key_pem)).unwrap();
