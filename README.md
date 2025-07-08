@@ -91,8 +91,7 @@ You will need to have the static library somewhere in the file system.
 ### Building libray locally
 Run: 
 ```bash
-cargo build 
-
+cargo build
 ```
 
 ### run example bot
