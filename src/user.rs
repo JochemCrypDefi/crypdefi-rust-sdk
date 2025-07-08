@@ -1,5 +1,5 @@
-use super::http::{SigResponse, SignatureRequestKind, get_wallets, logout, refresh_auth, sign};
-use super::{
+use crate::http::{SigResponse, SignatureRequestKind, get_wallets, logout, refresh_auth, sign};
+use crate::{
     error::BotSdkError,
     http::{CraRequest, LoginRequest, Wallet, cra_login, login},
 };
@@ -55,10 +55,7 @@ impl Bot {
     ///let bot = Bot::new(priv_key).await.unwrap();
     /// ```
     pub fn new(pem_key: String) -> Result<Arc<Self>, BotSdkError> {
-        let signing_key = match SigningKey::from_pkcs8_pem(pem_key.as_str()) {
-            Ok(val) => val,
-            Err(err) => return Err(BotSdkError::Pkcs8Error(err.to_string())),
-        };
+        let signing_key = SigningKey::from_pkcs8_pem(pem_key.as_str())?;
 
         let (cancel_tx, cancel_rx) = watch::channel(false);
 
@@ -125,18 +122,12 @@ impl Bot {
 
         let response = login(login_req).await?;
 
-        let challenge_bytes = match hex::decode(response.challenge.clone()) {
-            Ok(bytes) => bytes,
-            Err(err) => return Err(BotSdkError::HexError(err.to_string())),
-        };
+        let challenge_bytes = hex::decode(response.challenge.clone())?;
 
         let signed_challenge =
             sign_challenge_with_ecdsa(self.private_cert.clone(), challenge_bytes)?;
 
-        let signed_bytes = match signed_challenge.to_der() {
-            Ok(bytes) => bytes,
-            Err(err) => return Err(BotSdkError::DEREncodeFail(err.to_string())),
-        };
+        let signed_bytes = signed_challenge.to_der()?;
 
         let hex_signed_challenge = hex::encode(signed_bytes);
 
@@ -262,7 +253,7 @@ impl Bot {
     /// let wallet_id = "wa-0000000000-4f45f9d208e9207736fb".to_string();
     /// let transaction_hex = "02f8af01018390f560850461933067828cb394a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4880b844095ea7b300000000000000000000000097802f38a37e1d789eba194513e3eb7e918d34df000000000000000000000000000000000000000000000000000000001dcd6500c001a0ad0b4a87309ef94b96d38f145d676d971ca1f1e4702c9cace99fdec8df4a8814a008651a171f31629bcf3a686ca26b9d3cece44c6dfec39fb2c1848e3b290ba121".to_string();
     ///
-    /// let signature = bot.sign_transaction(wallet_id,crypdefi_bot_sdk::crypdefi::http::SignatureRequestKind::Transaction, transaction_hex).await.unwrap();
+    /// let signature = bot.sign_transaction(wallet_id, crate::http::SignatureRequestKind::Transaction, transaction_hex).await.unwrap();
     /// println!("Signature: {:?}", signature);
     /// ```
     pub async fn sign_transaction(

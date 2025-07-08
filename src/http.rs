@@ -1,4 +1,4 @@
-use super::error::BotSdkError;
+use crate::error::BotSdkError;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -32,36 +32,19 @@ pub struct LoginResponse {
 pub async fn login(req: LoginRequest) -> Result<LoginResponse, BotSdkError> {
     let url = get_url_base("/auth/login".to_string());
     let client = Client::new();
-    let response = match client.post(url).json(&req).send().await {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-    };
+    let response = client.post(url).json(&req).send().await?;
+
     if response.status().is_success() {
-        let text = match response.text().await {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let text = response.text().await?;
         let v: serde_json::Value = serde_json::from_str(&text).unwrap();
-        let res = match serde_json::from_value::<LoginResponse>(v) {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let res = serde_json::from_value::<LoginResponse>(v)?;
         return Ok(res);
     }
 
     let status = response.status();
-    let res = match response.text().await {
-        Ok(_) => {
-            return Err(BotSdkError::RequestError(format!(
-                "{}.\n Status: {}  ",
-                "Could not make login request".to_string(),
-                status,
-            )));
-        }
-        Err(err) => BotSdkError::RequestError(err.to_string()),
-    };
+    let res = response.text().await?;
 
-    return Err(BotSdkError::RequestError(format!(
+    return Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
         "Could not make login request".to_string(),
         status,
@@ -89,37 +72,19 @@ pub struct CraResponse {
 pub async fn cra_login(req: CraRequest) -> Result<CraResponse, BotSdkError> {
     let url = get_url_base("/auth/cra".to_string());
     let client = Client::new();
+    let response = client.post(url).json(&req).send().await?;
 
-    let response = match client.post(url).json(&req).send().await {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-    };
     if response.status().is_success() {
-        let text = match response.text().await {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let text = response.text().await?;
         let v: serde_json::Value = serde_json::from_str(&text).unwrap();
-        let res = match serde_json::from_value::<CraResponse>(v) {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let res = serde_json::from_value::<CraResponse>(v)?;
         return Ok(res);
     }
 
     let status = response.status();
-    let res = match response.text().await {
-        Ok(_) => {
-            return Err(BotSdkError::RequestError(format!(
-                "{}.\n Status: {}  ",
-                "Could not make cra login re".to_string(),
-                status,
-            )));
-        }
-        Err(err) => BotSdkError::RequestError(err.to_string()),
-    };
+    let res = response.text().await?;
 
-    return Err(BotSdkError::RequestError(format!(
+    return Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
         "Could not make CRA login".to_string(),
         status,
@@ -134,6 +99,8 @@ enum WalletState {
     #[serde(rename = "inactive")]
     Inactive,
 }
+
+#[allow(dead_code)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct ChainSimple {
     /** The ID of the chain */
@@ -142,6 +109,7 @@ pub struct ChainSimple {
     name: String,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Wallet {
     /** The id of the wallet */
@@ -167,42 +135,23 @@ pub async fn get_wallets(access_token_arc: &Option<String>) -> Result<Vec<Wallet
 
     let client = Client::new();
 
-    let response = match client
+    let response = client
         .get(url)
         .bearer_auth(access_token.clone())
         .send()
-        .await
-    {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-    };
+        .await?;
 
     if response.status().is_success() {
-        let text = match response.text().await {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let text = response.text().await?;
         let v: serde_json::Value = serde_json::from_str(&text).unwrap();
-        let res = match serde_json::from_value::<Vec<Wallet>>(v) {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let res = serde_json::from_value::<Vec<Wallet>>(v)?;
         return Ok(res);
     }
 
     let status = response.status();
-    let res = match response.text().await {
-        Ok(_) => {
-            return Err(BotSdkError::RequestError(format!(
-                "{}.\n Status: {}  ",
-                "Could not get wallets".to_string(),
-                status,
-            )));
-        }
-        Err(err) => BotSdkError::RequestError(err.to_string()),
-    };
+    let res = response.text().await?;
 
-    return Err(BotSdkError::RequestError(format!(
+    return Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
         "Could not get wallets".to_string(),
         status,
@@ -219,6 +168,7 @@ pub struct SignRequest {
     pub raw_bytes: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Signature {
     r: String,
@@ -229,15 +179,9 @@ pub struct Signature {
 impl Signature {
     pub fn to_der(&self) -> Result<Vec<u8>, BotSdkError> {
         // Convert hex strings to byte vectors
-        let r_bytes = match hex::decode(&self.r) {
-            Ok(val) => val,
-            Err(err) => return Err(BotSdkError::DEREncodeFail(err.to_string())),
-        };
+        let r_bytes = hex::decode(&self.r)?;
 
-        let s_bytes = match hex::decode(&self.s) {
-            Ok(val) => val,
-            Err(err) => return Err(BotSdkError::DEREncodeFail(err.to_string())),
-        };
+        let s_bytes = hex::decode(&self.s)?;
 
         // Ensure r and s are properly padded or trimmed for DER encoding
         let r_der = self.encode_integer(&r_bytes);
@@ -287,18 +231,21 @@ pub enum KeyAlgorithm {
     EddsaEd25519,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct PublicKey {
     algorithm: KeyAlgorithm,
     public_key: String,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct SigResponse {
     payload: SignRequest,
     key: PublicKey,
     signature: Signature,
 }
+
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub enum SignatureRequestKind {
     #[serde(rename = "raw")]
@@ -335,42 +282,24 @@ pub async fn sign(
         raw_bytes: None,
     };
 
-    let response = match client
+    let response = client
         .post(url)
         .json(&req)
         .bearer_auth(access_token.clone())
         .send()
-        .await
-    {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-    };
+        .await?;
+
     if response.status().is_success() {
-        let text = match response.text().await {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let text = response.text().await?;
         let v: serde_json::Value = serde_json::from_str(&text).unwrap();
-        let res = match serde_json::from_value::<SigResponse>(v) {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let res = serde_json::from_value::<SigResponse>(v)?;
         return Ok(res);
     }
 
     let status = response.status();
-    let res = match response.text().await {
-        Ok(_) => {
-            return Err(BotSdkError::RequestError(format!(
-                "{}.\n Status: {}  ",
-                "Could not get signature".to_string(),
-                status,
-            )));
-        }
-        Err(err) => BotSdkError::RequestError(err.to_string()),
-    };
+    let res = response.text().await?;
 
-    return Err(BotSdkError::RequestError(format!(
+    return Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
         "Could not get signature".to_string(),
         status,
@@ -389,32 +318,19 @@ pub async fn logout(access_token_arc: &Option<String>) -> Result<(), BotSdkError
 
     let client = Client::new();
 
-    let response = match client
+    let response = client
         .post(url)
         .bearer_auth(access_token.clone())
         .send()
-        .await
-    {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-    };
+        .await?;
 
     if response.status().is_success() {
         return Ok(());
     }
     let status = response.status();
-    let res = match response.text().await {
-        Ok(_) => {
-            return Err(BotSdkError::RequestError(format!(
-                "{}.\n Status: {}  ",
-                "Could not logout".to_string(),
-                status,
-            )));
-        }
-        Err(err) => BotSdkError::RequestError(err.to_string()),
-    };
+    let res = response.text().await?;
 
-    return Err(BotSdkError::RequestError(format!(
+    return Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
         "Could not logout".to_string(),
         status,
@@ -449,42 +365,23 @@ pub async fn refresh_auth(
         refresh_token: refresh_token.clone(),
     };
 
-    let response = match client
+    let response = client
         .post(url)
         .json(&req_body)
         .bearer_auth(access_token.clone())
         .send()
-        .await
-    {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-    };
+        .await?;
     if response.status().is_success() {
-        let text = match response.text().await {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let text = response.text().await?;
         let v: serde_json::Value = serde_json::from_str(&text).unwrap();
-        let res = match serde_json::from_value::<CraResponse>(v) {
-            Ok(res) => res,
-            Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
-        };
+        let res = serde_json::from_value::<CraResponse>(v)?;
         return Ok(res);
     }
 
     let status = response.status();
-    let res = match response.text().await {
-        Ok(_) => {
-            return Err(BotSdkError::RequestError(format!(
-                "{}.\n Status: {}  ",
-                "Could not refresh auth".to_string(),
-                status,
-            )));
-        }
-        Err(err) => BotSdkError::RequestError(err.to_string()),
-    };
+    let res = response.text().await?;
 
-    return Err(BotSdkError::RequestError(format!(
+    return Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
         "Could not refresh auth".to_string(),
         status,

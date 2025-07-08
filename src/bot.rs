@@ -1,4 +1,4 @@
-use crypdefi_bot_sdk::crypdefi::{SignatureRequestKind, error::BotSdkError, user::Bot};
+use crypdefi_bot_sdk::{error::BotSdkError, http::SignatureRequestKind, user::Bot};
 
 #[tokio::main]
 async fn main() -> Result<(), BotSdkError> {

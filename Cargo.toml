@@ -21,11 +21,9 @@ sha2 = "0.10.8"
 hex = "0.4.3"
 serde_json = "1.0.140"
 
-
-
 [lib]
 name = "crypdefi_bot_sdk"
-crate-type = ["lib"]
+path = "src/lib.rs"
 
 
 [[bin]]

@@ -5,8 +5,6 @@ Bot traders interact with the CrypDefi backend via API calls. To simplify
 authentication and transaction signing, the Bot SDK can be used instead
 of manually managing individual API requests.
 
-This rust library is also used for making bindings in the Go and Python languages.
-
 ## Create keys for the Bot login.
 
 ### Generate Bot's private key.
@@ -24,6 +22,10 @@ openssl pkey -in private_key_pkcs8.pem -pubout -out public_key.pem
 ## Examples
 
 ```rust
+use crypdefi_bot_sdk::user::Bot;
+use crypdefi_bot_sdk::http::SignatureRequestKind;
+use std::fs;
+
 // --------------------------- CONFIG ---------------------------
 // Replace with one of your bot's wallet_id.
 const user_id = "us-0000000000-691dc9136b45c44f621f"; 
@@ -47,16 +49,16 @@ println!("Logging in with Bot...");
 // if you turn off auto_refresh the bot will not automatically re-authenticate itself when its login-token is about to expire
 bot.login(
     user_id.to_string(),
-    Some(false)
+    Some(false).await
 ).unwrap();
  
 // --------------------------- Check for expiration time of AUTH ---------------------------
-let expiration = bot.auth_expiration_unix_time();
+let expiration = bot.auth_expiration_unix_time().await;
 println!("Expiration: {:?}\n", expiration);
  
 // --------------------------- FETCH ASSOCIATED WALLETS ---------------------------
 println!("Fetching wallets associated with Bot...");
-let wallets = bot.get_wallets().unwrap();
+let wallets = bot.get_wallets().await.unwrap();
 println!("Wallets: {:?}\n", wallets);
  
 // --------------------------- CREATE & SIGN TRANSACTION ---------------------------
@@ -70,16 +72,16 @@ let signature = bot.sign_transaction(
     wallet_id.to_string(),
     SignatureRequestKind::Transaction,
     example_evm_hex.to_string()
-).unwrap();
+).await.unwrap();
 println!("Signature: {:?}\n", signature);
  
 // --------------------------- REFRESH SESSION ---------------------------
 println!("Refreshing Bot session...");
-let refresh_result = bot.refresh().unwrap();
+let refresh_result = bot.refresh().await.unwrap();
 println!("Refresh result: {:?}\n", refresh_result);
  
 // --------------------------- LOGOUT ---------------------------
-let logout_result = bot.logout().unwrap();
+let logout_result = bot.logout().await.unwrap();
 println!("Logout result: {:?}", logout_result);
 ```
 
@@ -89,30 +91,13 @@ This are commands and tools for developers of the SDK.
 
 You will need to have the static library somewhere in the file system.
 
-```bash
-# /usr/local/lib is arbitrary
-scp target/release/libcrypdefi_bot_sdk.so /usr/local/lib
-```
-
-### build python 
+### Building libray locally
 Run: 
-
 ```bash
-cargo build --release
-
-cargo run --bin uniffi-bindgen generate --library target/release/libcrypdefi_bot_sdk.so --language python --out-dir python-sdk
+cargo build 
 
 ```
-### build GO and C
 
-Run: 
-
-```bash
-cargo build --release
-
-uniffi-bindgen-go --library target/release/libcrypdefi_bot_sdk.so --out-dir go-sdk
-scp target/release/libcrypdefi_bot_sdk.so go-sdk/crypdefi_bot_sdk
-```
 ### run example bot
 
 This runs a very simple main function with the basic functionality of the SDK
