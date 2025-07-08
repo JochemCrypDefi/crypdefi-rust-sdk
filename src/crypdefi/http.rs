@@ -51,12 +51,16 @@ pub async fn login(req: LoginRequest) -> Result<LoginResponse, BotSdkError> {
 
     let status = response.status();
     let res = match response.text().await {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        Ok(_) => {
+            return Err(BotSdkError::Custom(
+                "Something unexpected happened".to_string(),
+            ));
+        }
+        Err(err) => BotSdkError::RequestError(err.to_string()),
     };
 
     return Err(BotSdkError::RequestError(format!(
-        "{}. Status: {} Body: {}",
+        "{}.\n Status: {} \n Body: {}",
         "Could not make login request".to_string(),
         status,
         res
@@ -103,12 +107,16 @@ pub async fn cra_login(req: CraRequest) -> Result<CraResponse, BotSdkError> {
 
     let status = response.status();
     let res = match response.text().await {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        Ok(_) => {
+            return Err(BotSdkError::Custom(
+                "Something unexpected happened".to_string(),
+            ));
+        }
+        Err(err) => BotSdkError::RequestError(err.to_string()),
     };
 
     return Err(BotSdkError::RequestError(format!(
-        "{}. Status: {} Body: {}",
+        "{}.\n Status: {} \n Body: {}",
         "Could not make CRA login".to_string(),
         status,
         res
@@ -180,12 +188,16 @@ pub async fn get_wallets(access_token_arc: &Option<String>) -> Result<Vec<Wallet
 
     let status = response.status();
     let res = match response.text().await {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        Ok(_) => {
+            return Err(BotSdkError::Custom(
+                "Something unexpected happened".to_string(),
+            ));
+        }
+        Err(err) => BotSdkError::RequestError(err.to_string()),
     };
 
     return Err(BotSdkError::RequestError(format!(
-        "{}. Status: {} Body: {}",
+        "{}.\n Status: {} \n Body: {}",
         "Could not get wallets".to_string(),
         status,
         res
@@ -342,12 +354,16 @@ pub async fn sign(
 
     let status = response.status();
     let res = match response.text().await {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        Ok(_) => {
+            return Err(BotSdkError::Custom(
+                "Something unexpected happened".to_string(),
+            ));
+        }
+        Err(err) => BotSdkError::RequestError(err.to_string()),
     };
 
     return Err(BotSdkError::RequestError(format!(
-        "{}. Status: {} Body: {}",
+        "{}.\n Status: {} \n Body: {}",
         "Could not get signature".to_string(),
         status,
         res
@@ -380,12 +396,16 @@ pub async fn logout(access_token_arc: &Option<String>) -> Result<(), BotSdkError
     }
     let status = response.status();
     let res = match response.text().await {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        Ok(_) => {
+            return Err(BotSdkError::Custom(
+                "Something unexpected happened".to_string(),
+            ));
+        }
+        Err(err) => BotSdkError::RequestError(err.to_string()),
     };
 
     return Err(BotSdkError::RequestError(format!(
-        "{}. Status: {} Body: {}",
+        "{}.\n Status: {} \n Body: {}",
         "Could not logout".to_string(),
         status,
         res
@@ -444,13 +464,17 @@ pub async fn refresh_auth(
 
     let status = response.status();
     let res = match response.text().await {
-        Ok(res) => res,
-        Err(err) => return Err(BotSdkError::RequestError(err.to_string())),
+        Ok(_) => {
+            return Err(BotSdkError::Custom(
+                "Something unexpected happened".to_string(),
+            ));
+        }
+        Err(err) => BotSdkError::RequestError(err.to_string()),
     };
 
     return Err(BotSdkError::RequestError(format!(
-        "{}. Status: {} Body: {}",
-        "Could not make CRA login".to_string(),
+        "{}.\n Status: {} \n Body: {}",
+        "Could not refresh the url".to_string(),
         status,
         res
     )));
