@@ -52,9 +52,11 @@ pub async fn login(req: LoginRequest) -> Result<LoginResponse, BotSdkError> {
     let status = response.status();
     let res = match response.text().await {
         Ok(_) => {
-            return Err(BotSdkError::Custom(
-                "Something unexpected happened".to_string(),
-            ));
+            return Err(BotSdkError::RequestError(format!(
+                "{}.\n Status: {}  ",
+                "Could not make login request".to_string(),
+                status,
+            )));
         }
         Err(err) => BotSdkError::RequestError(err.to_string()),
     };
@@ -108,9 +110,11 @@ pub async fn cra_login(req: CraRequest) -> Result<CraResponse, BotSdkError> {
     let status = response.status();
     let res = match response.text().await {
         Ok(_) => {
-            return Err(BotSdkError::Custom(
-                "Something unexpected happened".to_string(),
-            ));
+            return Err(BotSdkError::RequestError(format!(
+                "{}.\n Status: {}  ",
+                "Could not make cra login re".to_string(),
+                status,
+            )));
         }
         Err(err) => BotSdkError::RequestError(err.to_string()),
     };
@@ -123,14 +127,14 @@ pub async fn cra_login(req: CraRequest) -> Result<CraResponse, BotSdkError> {
     )));
 }
 
-#[derive(Deserialize, Debug, Clone, uniffi::Enum, Serialize)]
+#[derive(Deserialize, Debug, Clone, Serialize)]
 enum WalletState {
     #[serde(rename = "active")]
     Active,
     #[serde(rename = "inactive")]
     Inactive,
 }
-#[derive(Deserialize, Clone, uniffi::Record, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct ChainSimple {
     /** The ID of the chain */
     chain_id: String,
@@ -138,7 +142,7 @@ pub struct ChainSimple {
     name: String,
 }
 
-#[derive(Deserialize, Clone, uniffi::Record, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Wallet {
     /** The id of the wallet */
     wallet_id: String,
@@ -189,9 +193,11 @@ pub async fn get_wallets(access_token_arc: &Option<String>) -> Result<Vec<Wallet
     let status = response.status();
     let res = match response.text().await {
         Ok(_) => {
-            return Err(BotSdkError::Custom(
-                "Something unexpected happened".to_string(),
-            ));
+            return Err(BotSdkError::RequestError(format!(
+                "{}.\n Status: {}  ",
+                "Could not get wallets".to_string(),
+                status,
+            )));
         }
         Err(err) => BotSdkError::RequestError(err.to_string()),
     };
@@ -204,7 +210,7 @@ pub async fn get_wallets(access_token_arc: &Option<String>) -> Result<Vec<Wallet
     )));
 }
 
-#[derive(Serialize, Deserialize, uniffi::Record, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SignRequest {
     pub kind: SignatureRequestKind,
     pub data: String,
@@ -213,7 +219,7 @@ pub struct SignRequest {
     pub raw_bytes: Option<String>,
 }
 
-#[derive(Deserialize, Clone, uniffi::Record, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Signature {
     r: String,
     s: String,
@@ -273,7 +279,7 @@ impl Signature {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, uniffi::Enum, Serialize)]
+#[derive(Deserialize, Debug, Clone, Serialize)]
 pub enum KeyAlgorithm {
     #[serde(rename = "ECDSA_SECP256k1")]
     EcdsaSecp256k1,
@@ -281,19 +287,19 @@ pub enum KeyAlgorithm {
     EddsaEd25519,
 }
 
-#[derive(Deserialize, Clone, uniffi::Record, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct PublicKey {
     algorithm: KeyAlgorithm,
     public_key: String,
 }
 
-#[derive(Deserialize, uniffi::Record, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct SigResponse {
     payload: SignRequest,
     key: PublicKey,
     signature: Signature,
 }
-#[derive(Deserialize, Debug, Clone, uniffi::Enum, Serialize)]
+#[derive(Deserialize, Debug, Clone, Serialize)]
 pub enum SignatureRequestKind {
     #[serde(rename = "raw")]
     Raw,
@@ -355,9 +361,11 @@ pub async fn sign(
     let status = response.status();
     let res = match response.text().await {
         Ok(_) => {
-            return Err(BotSdkError::Custom(
-                "Something unexpected happened".to_string(),
-            ));
+            return Err(BotSdkError::RequestError(format!(
+                "{}.\n Status: {}  ",
+                "Could not get signature".to_string(),
+                status,
+            )));
         }
         Err(err) => BotSdkError::RequestError(err.to_string()),
     };
@@ -397,9 +405,11 @@ pub async fn logout(access_token_arc: &Option<String>) -> Result<(), BotSdkError
     let status = response.status();
     let res = match response.text().await {
         Ok(_) => {
-            return Err(BotSdkError::Custom(
-                "Something unexpected happened".to_string(),
-            ));
+            return Err(BotSdkError::RequestError(format!(
+                "{}.\n Status: {}  ",
+                "Could not logout".to_string(),
+                status,
+            )));
         }
         Err(err) => BotSdkError::RequestError(err.to_string()),
     };
@@ -465,16 +475,18 @@ pub async fn refresh_auth(
     let status = response.status();
     let res = match response.text().await {
         Ok(_) => {
-            return Err(BotSdkError::Custom(
-                "Something unexpected happened".to_string(),
-            ));
+            return Err(BotSdkError::RequestError(format!(
+                "{}.\n Status: {}  ",
+                "Could not refresh auth".to_string(),
+                status,
+            )));
         }
         Err(err) => BotSdkError::RequestError(err.to_string()),
     };
 
     return Err(BotSdkError::RequestError(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not refresh the url".to_string(),
+        "Could not refresh auth".to_string(),
         status,
         res
     )));

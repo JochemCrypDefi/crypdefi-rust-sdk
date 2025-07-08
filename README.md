@@ -86,6 +86,14 @@ println!("Logout result: {:?}", logout_result);
 ## DEVELOPMENT
 This are commands and tools for developers of the SDK.
 
+
+You will need to have the static library somewhere in the file system.
+
+```bash
+# /usr/local/lib is arbitrary
+scp target/release/libcrypdefi_bot_sdk.so /usr/local/lib
+```
+
 ### build python 
 Run: 
 

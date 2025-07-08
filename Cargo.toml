@@ -1,6 +1,6 @@
 [package]
 name = "crypdefi-bot-sdk"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 exclude = [
     "python-sdk",
@@ -15,29 +15,18 @@ pkcs8 = { version ="0.10.2", features = ["pem", "std"] }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1.0.219", features = ["serde_derive"] }
 thiserror = "2.0.12"
-uniffi = { version = "0.28.3", features = [ "cli", "build" ] }
 tokio = { version = "1", features = ["full"] }
 pem = "3.0.5"
 sha2 = "0.10.8"
 hex = "0.4.3"
 serde_json = "1.0.140"
 
-[build-dependencies]
-uniffi = { version = "0.28.3", features = [ "cli", "build" ] }
-
-[dev-dependencies]
-uniffi = { version = "0.28.3", features = [ "cli", "build" ] }
 
 
 [lib]
 name = "crypdefi_bot_sdk"
-crate-type = ["cdylib", "lib"]
+crate-type = ["lib"]
 
-
-[[bin]]
-# This can be whatever name makes sense for your project, but the rest of this tutorial assumes uniffi-bindgen.
-name = "uniffi-bindgen"
-path = "src/uniffi-bindgen.rs"
 
 [[bin]]
 name = "crypdefi-bot"

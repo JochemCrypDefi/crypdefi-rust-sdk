@@ -8,7 +8,6 @@ use p256::ecdsa::{VerifyingKey, signature::Verifier};
 use pkcs8::{DecodePrivateKey, der::Encode};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::runtime::Runtime;
 use tokio::sync::{RwLock, watch};
 
 fn sign_challenge_with_ecdsa(
@@ -27,7 +26,7 @@ fn sign_challenge_with_ecdsa(
 /// Bot used signing requests for crypdefi wallets.
 ///
 /// # Note: Most of the implemented functions in the bot use the tokio runtime inside it.
-#[derive(Debug, uniffi::Object)]
+#[derive(Debug)]
 pub struct Bot {
     pub wallets: Arc<RwLock<Vec<Wallet>>>,
     private_cert: SigningKey,
@@ -42,21 +41,18 @@ pub struct Bot {
     refresh_expiration_time: Arc<RwLock<Option<u64>>>,
 }
 
-#[uniffi::export]
 impl Bot {
-    #[uniffi::constructor]
-    /// constructs a new `Bot`
-    /// You need to have a valid pem encoded private key.
+    /// Creates a bot instance used to sign requests and interact with CrypDefi wallets.
     ///
     /// # Example
-    /// ```
+    /// ```rust
     /// let priv_key =   "-----BEGIN PRIVATE KEY-----
     /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
     /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    ///let bot = Bot::new(priv_key).unwrap();
+    ///let bot = Bot::new(priv_key).await.unwrap();
     /// ```
     pub fn new(pem_key: String) -> Result<Arc<Self>, BotSdkError> {
         let signing_key = match SigningKey::from_pkcs8_pem(pem_key.as_str()) {
@@ -71,7 +67,7 @@ impl Bot {
             access_token: Arc::new(RwLock::new(None)),
             refresh_token: Arc::new(RwLock::new(None)),
             wallets: Arc::new(RwLock::new(Vec::new())),
-            auto_refresh_enabled: Arc::new(RwLock::new(false)),
+            auto_refresh_enabled: Arc::new(RwLock::new(true)),
 
             refresh_handle: Arc::new(RwLock::new(None)),
             refresh_cancel_sender: Arc::new(cancel_tx),
@@ -80,10 +76,10 @@ impl Bot {
         }))
     }
 
-    /// logs in to the crypdefi user
+    /// Authenticates the bot using the provided user ID. If `auto_refresh` is enabled, the SDK will handle token renewal automatically.
     ///
     /// # Example
-    /// ```
+    /// ```rust
     /// let priv_key =   "-----BEGIN PRIVATE KEY-----
     /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
     /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
@@ -93,11 +89,15 @@ impl Bot {
     /// let bot = Bot::new(priv_key).unwrap();
     ///
     /// NOTE: By default the bot will auto_refresh login
-    /// bot.login(String::from("us-0000000000-fbf17c83704f04af11c6"), None).unwrap();
+    /// bot.login(String::from("us-0000000000-fbf17c83704f04af11c6"), None).await.unwrap();
     /// ```
     ///
     /// # Note: uses tokio async runtime
-    pub fn login(&self, user_id: String, auto_refresh: Option<bool>) -> Result<(), BotSdkError> {
+    pub async fn login(
+        &self,
+        user_id: String,
+        auto_refresh: Option<bool>,
+    ) -> Result<(), BotSdkError> {
         let user_iter: Vec<&str> = user_id.split("-").collect();
 
         if user_iter.len() < 3 {
@@ -114,131 +114,117 @@ impl Bot {
             auth_method: "cra".to_string(),
         };
 
-        let rt = match Runtime::new() {
-            Ok(runtime) => runtime,
-            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
+        // Cancel any existing refresh task
+        self.cancel_refresh_task().await;
+
+        let mut auto_refresh_lock = self.auto_refresh_enabled.write().await;
+        if let Some(auto) = auto_refresh {
+            *auto_refresh_lock = auto;
+        }
+        drop(auto_refresh_lock);
+
+        let response = login(login_req).await?;
+
+        let challenge_bytes = match hex::decode(response.challenge.clone()) {
+            Ok(bytes) => bytes,
+            Err(err) => return Err(BotSdkError::HexError(err.to_string())),
         };
 
-        return rt.block_on(async move || -> Result<(), BotSdkError> {
-            // Cancel any existing refresh task
-            self.cancel_refresh_task().await;
+        let signed_challenge =
+            sign_challenge_with_ecdsa(self.private_cert.clone(), challenge_bytes)?;
 
-            let mut auto_refresh_lock = self.auto_refresh_enabled.write().await;
-            if let Some(auto) = auto_refresh {
-                *auto_refresh_lock = auto;
-            }
-            drop(auto_refresh_lock);
+        let signed_bytes = match signed_challenge.to_der() {
+            Ok(bytes) => bytes,
+            Err(err) => return Err(BotSdkError::DEREncodeFail(err.to_string())),
+        };
 
-            let response = login(login_req).await?;
+        let hex_signed_challenge = hex::encode(signed_bytes);
 
-            let challenge_bytes = match hex::decode(response.challenge.clone()) {
-                Ok(bytes) => bytes,
-                Err(err) => return Err(BotSdkError::HexError(err.to_string())),
-            };
+        let login_req = CraRequest {
+            user_id,
+            challenge: response.challenge,
+            response: hex_signed_challenge,
+            hash_algorithm: "sha256".to_string(),
+        };
 
-            let signed_challenge =
-                sign_challenge_with_ecdsa(self.private_cert.clone(), challenge_bytes)?;
+        let cra_response = cra_login(login_req).await?;
 
-            let signed_bytes = match signed_challenge.to_der() {
-                Ok(bytes) => bytes,
-                Err(err) => return Err(BotSdkError::DEREncodeFail(err.to_string())),
-            };
+        // Store tokens
+        let mut access_lock = self.access_token.write().await;
+        *access_lock = Some(cra_response.token);
+        drop(access_lock);
 
-            let hex_signed_challenge = hex::encode(signed_bytes);
+        let mut refresh_lock = self.refresh_token.write().await;
+        *refresh_lock = Some(cra_response.refresh_token);
+        drop(refresh_lock);
 
-            let login_req = CraRequest {
-                user_id,
-                challenge: response.challenge,
-                response: hex_signed_challenge,
-                hash_algorithm: "sha256".to_string(),
-            };
+        let mut refresh_time_lock = self.refresh_expiration_time.write().await;
+        *refresh_time_lock = Some(cra_response.expires_at);
+        drop(refresh_time_lock);
 
-            let cra_response = cra_login(login_req).await?;
+        // Start refresh task if auto_refresh is enabled
+        let auto_refresh_enabled = self.auto_refresh_enabled.read().await;
+        if *auto_refresh_enabled {
+            drop(auto_refresh_enabled);
+            self.start_refresh_task(cra_response.seconds - 10).await?;
+        }
 
-            // Store tokens
-            let mut access_lock = self.access_token.write().await;
-            *access_lock = Some(cra_response.token);
-            drop(access_lock);
-
-            let mut refresh_lock = self.refresh_token.write().await;
-            *refresh_lock = Some(cra_response.refresh_token);
-            drop(refresh_lock);
-
-            let mut refresh_time_lock = self.refresh_expiration_time.write().await;
-            *refresh_time_lock = Some(cra_response.expires_at);
-            drop(refresh_time_lock);
-
-            // Start refresh task if auto_refresh is enabled
-            let auto_refresh_enabled = self.auto_refresh_enabled.read().await;
-            if *auto_refresh_enabled {
-                drop(auto_refresh_enabled);
-                self.start_refresh_task(cra_response.seconds - 10).await?;
-            }
-
-            Ok(())
-        }());
+        Ok(())
     }
 
-    /// Tries to refresh the access_token for the bot.
+    /// Manually refreshes the bot’s access token. Only needed if auto-refresh is disabled.
     ///
     /// # Example
-    /// ```
+    /// ```rust
     /// let priv_key =   "-----BEGIN PRIVATE KEY-----
     /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
     /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key).unwrap();
+    /// let bot = Bot::new(priv_key).await.unwrap();
     /// bot.refresh().unwrap
     /// ```
     ///
     /// # Note: uses tokio async runtime
-    pub fn refresh(&self) -> Result<(), BotSdkError> {
-        let rt = match Runtime::new() {
-            Ok(runtime) => runtime,
-            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
-        };
+    pub async fn refresh(&self) -> Result<(), BotSdkError> {
+        let access_lock = self.access_token.read().await;
+        let refresh_lock = self.refresh_token.read().await;
+        let response = refresh_auth(&refresh_lock, &access_lock).await?;
 
-        return rt.block_on(async move || -> Result<(), BotSdkError> {
-            let access_lock = self.access_token.read().await;
-            let refresh_lock = self.refresh_token.read().await;
-            let response = refresh_auth(&refresh_lock, &access_lock).await?;
+        drop(access_lock);
+        drop(refresh_lock);
 
-            drop(access_lock);
-            drop(refresh_lock);
+        let mut access_lock = self.access_token.write().await;
+        *access_lock = Some(response.token);
 
-            let mut access_lock = self.access_token.write().await;
-            *access_lock = Some(response.token);
+        let mut refresh_lock = self.refresh_token.write().await;
+        *refresh_lock = Some(response.refresh_token);
 
-            let mut refresh_lock = self.refresh_token.write().await;
-            *refresh_lock = Some(response.refresh_token);
+        let mut refresh_time_lock = self.refresh_expiration_time.write().await;
+        *refresh_time_lock = Some(response.expires_at);
+        drop(refresh_time_lock);
 
-            let mut refresh_time_lock = self.refresh_expiration_time.write().await;
-            *refresh_time_lock = Some(response.expires_at);
-            drop(refresh_time_lock);
+        // if autorefresh is true we restart the watcher thread.
+        let auto_refresh_enabled = self.auto_refresh_enabled.read().await;
+        if *auto_refresh_enabled {
+            drop(auto_refresh_enabled);
 
-            // if autorefresh is true we restart the watcher thread.
-            let auto_refresh_enabled = self.auto_refresh_enabled.read().await;
-            if *auto_refresh_enabled {
-                drop(auto_refresh_enabled);
+            // Cancel the existing refresh thread and make a new one
+            self.refresh_cancel_sender
+                .send(true)
+                .map_err(|_| BotSdkError::Custom("Failed to send cancel signal".to_string()))?;
 
-                // Cancel the existing refresh thread and make a new one
-                self.refresh_cancel_sender
-                    .send(true)
-                    .map_err(|_| BotSdkError::Custom("Failed to send cancel signal".to_string()))?;
+            self.start_refresh_task(response.seconds - 10).await?;
+        }
 
-                self.start_refresh_task(response.seconds - 10).await?;
-            }
-
-            return Ok(());
-        }());
+        return Ok(());
     }
 
-    /// gets the wallets currently stored in the bot
+    /// Fetches all wallets associated with the authenticated bot user.
     ///
     /// # Example
-    /// ```
+    /// ```rust
     /// let priv_key =   "-----BEGIN PRIVATE KEY-----
     /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
     /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
@@ -246,32 +232,25 @@ impl Bot {
     /// -----END PRIVATE KEY-----",
     ///
     /// let bot = Bot::new(priv_key).unwrap();
-    /// let wallets = bot.get_wallets().unwrap();
+    /// let wallets = bot.get_wallets().await.unwrap();
     /// println!("wallets: {:?}", wallets);
     /// ```
     ///
     /// # Note: uses tokio async runtime
-    pub fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
-        let rt = match Runtime::new() {
-            Ok(runtime) => runtime,
-            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
-        };
+    pub async fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
+        let access_lock = self.access_token.read().await;
+        let wallets = get_wallets(&*access_lock).await?;
 
-        return rt.block_on(async move || -> Result<Vec<Wallet>, BotSdkError> {
-            let access_lock = self.access_token.read().await;
-            let wallets = get_wallets(&*access_lock).await?;
+        let mut wallets_lock = self.wallets.write().await;
+        *wallets_lock = wallets.clone();
 
-            let mut wallets_lock = self.wallets.write().await;
-            *wallets_lock = wallets.clone();
-
-            return Ok(wallets);
-        }());
+        return Ok(wallets);
     }
 
-    /// send the transaction hex to crypdefi for signging
+    /// Signs a transaction (hex-encoded) using the specified wallet and signature request kind. The bot must have access to the wallet in the CrypDefi management UI.
     ///
     /// # Example
-    /// ```
+    /// ```rust
     /// let priv_key =   "-----BEGIN PRIVATE KEY-----
     /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
     /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
@@ -283,34 +262,25 @@ impl Bot {
     /// let wallet_id = "wa-0000000000-4f45f9d208e9207736fb".to_string();
     /// let transaction_hex = "02f8af01018390f560850461933067828cb394a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4880b844095ea7b300000000000000000000000097802f38a37e1d789eba194513e3eb7e918d34df000000000000000000000000000000000000000000000000000000001dcd6500c001a0ad0b4a87309ef94b96d38f145d676d971ca1f1e4702c9cace99fdec8df4a8814a008651a171f31629bcf3a686ca26b9d3cece44c6dfec39fb2c1848e3b290ba121".to_string();
     ///
-    /// let wallets = bot.sign_transaction(wallet_id,crypdefi_bot_sdk::crypdefi::http::SignatureRequestKind::Transaction, transaction_hex).unwrap();
-    /// println!("wallets: {:?}", wallets);
+    /// let signature = bot.sign_transaction(wallet_id,crypdefi_bot_sdk::crypdefi::http::SignatureRequestKind::Transaction, transaction_hex).await.unwrap();
+    /// println!("Signature: {:?}", signature);
     /// ```
-    ///
-    /// # Note: uses tokio async runtime
-    pub fn sign_transaction(
+    pub async fn sign_transaction(
         &self,
         wallet_id: String,
         tx_type: SignatureRequestKind,
         hex_value: String,
     ) -> Result<SigResponse, BotSdkError> {
-        let rt = match Runtime::new() {
-            Ok(runtime) => runtime,
-            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
-        };
+        let access_lock = self.access_token.read().await;
+        let signature = sign(&*access_lock, wallet_id, tx_type, hex_value).await?;
 
-        return rt.block_on(async move || -> Result<SigResponse, BotSdkError> {
-            let access_lock = self.access_token.read().await;
-            let signature = sign(&*access_lock, wallet_id, tx_type, hex_value).await?;
-
-            return Ok(signature);
-        }());
+        return Ok(signature);
     }
 
-    /// logs out the user
+    /// Logs out the bot and invalidates its current session token.
     ///
     /// # Example
-    /// ```
+    /// ```rust
     /// let priv_key =   "-----BEGIN PRIVATE KEY-----
     /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
     /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
@@ -319,35 +289,24 @@ impl Bot {
     ///
     /// let bot = Bot::new(priv_key).unwrap();
     ///
-    /// let wallet_id = "wa-0000000000-4f45f9d208e9207736fb".to_string();
-    /// let transaction_hex = "02f8af01018390f560850461933067828cb394a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4880b844095ea7b300000000000000000000000097802f38a37e1d789eba194513e3eb7e918d34df000000000000000000000000000000000000000000000000000000001dcd6500c001a0ad0b4a87309ef94b96d38f145d676d971ca1f1e4702c9cace99fdec8df4a8814a008651a171f31629bcf3a686ca26b9d3cece44c6dfec39fb2c1848e3b290ba121".to_string();
-    ///
-    /// let wallets = bot.sign_transaction(wallet_id,crypdefi_bot_sdk::crypdefi::http::SignatureRequestKind::Transaction, transaction_hex).unwrap();
-    /// println!("wallets: {:?}", wallets);
+    /// bot.logout().await.unwrap();
     /// ```
     ///
     /// # Note: uses tokio async runtime
-    pub fn logout(&self) -> Result<(), BotSdkError> {
-        let rt = match Runtime::new() {
-            Ok(runtime) => runtime,
-            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
-        };
+    pub async fn logout(&self) -> Result<(), BotSdkError> {
+        self.cancel_refresh_task().await;
+        let access_lock = self.access_token.read().await;
+        let res = logout(&*access_lock).await?;
+        drop(access_lock);
+        let mut access_lock = self.access_token.write().await;
+        *access_lock = None;
 
-        return rt.block_on(async move || -> Result<(), BotSdkError> {
-            self.cancel_refresh_task().await;
-            let access_lock = self.access_token.read().await;
-            let res = logout(&*access_lock).await?;
-            drop(access_lock);
-            let mut access_lock = self.access_token.write().await;
-            *access_lock = None;
+        let mut refresh_lock = self.refresh_token.write().await;
+        *refresh_lock = None;
+        let mut expiration = self.refresh_expiration_time.write().await;
+        *expiration = None;
 
-            let mut refresh_lock = self.refresh_token.write().await;
-            *refresh_lock = None;
-            let mut expiration = self.refresh_expiration_time.write().await;
-            *expiration = None;
-
-            return Ok(res);
-        }());
+        return Ok(res);
     }
 
     /// This watches for refresh
@@ -399,6 +358,7 @@ impl Bot {
                     }
                     _ = cancel_receiver.changed() => {
                         if *cancel_receiver.borrow() {
+                            println!("stoping thread watching for refresh...");
                             break;
                         }
                     }
@@ -420,15 +380,22 @@ impl Bot {
         }
     }
 
-    pub fn auth_expiration_unix_time(&self) -> Option<u64> {
-        let rt = match Runtime::new() {
-            Ok(runtime) => runtime,
-            Err(err) => return Err(BotSdkError::TokioError(err.to_string())),
-        };
-
-        return rt.block_on(async move || -> Option<u64> {
-            let expiration = self.refresh_expiration_time.read().await;
-            return *expiration;
-        }());
+    ///  Returns the Unix timestamp when the current auth token will expire.
+    ///
+    /// # Example
+    /// ```rust
+    /// let priv_key =   "-----BEGIN PRIVATE KEY-----
+    /// MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgWy5TsnH8AwJVPLJS
+    /// V6AYLJlpVcTjZi4Pwil8lN79Xr+hRANCAARsNq7YC/YhcveRVnwzSnIUvbpbdHFy
+    /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
+    /// -----END PRIVATE KEY-----",
+    ///
+    /// let bot = Bot::new(priv_key).unwrap();
+    ///
+    /// bot.auth_expiration_unix_time().await;
+    /// ```
+    pub async fn auth_expiration_unix_time(&self) -> Result<Option<u64>, BotSdkError> {
+        let expiration = self.refresh_expiration_time.read().await;
+        return Ok(*expiration);
     }
 }

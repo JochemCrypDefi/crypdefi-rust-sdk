@@ -1,5 +1,5 @@
 /// Possible errors that can occur inside the library
-#[derive(Clone, Debug, uniffi::Error, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum BotSdkError {
     #[error("Could not login to sdk")]
     LoginError,
