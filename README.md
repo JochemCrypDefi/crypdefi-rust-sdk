@@ -9,14 +9,28 @@ of manually managing individual API requests.
 
 ### Generate Bot's private key
 
+# Unix
 ```bash
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out private_key_pkcs8.pem
+openssl ecparam -genkey -name prime256v1 -out bot_private_key.key
 ```
+ 
+# Windows
+ ```bash
+ssh-keygen.exe -t ecdsa -b 256 -m pkcs8 -f .\\bot_key
+```
+
 
 ### Generate Bot's public key
 
+# Unix
 ```bash
-openssl pkey -in private_key_pkcs8.pem -pubout -out public_key.pem
+openssl ec -in bot_private_key.key -pubout -out bot_public_key.pem
+openssl pkcs8 -in bot_private_key.key -inform pem -topk8 -nocrypt -out bot_private_key.pkcs8
+```
+ 
+# Windows
+```bash
+    ssh-keygen.exe -f .\\bot_key.pub -e -m pkcs8
 ```
 
 ## Examples
