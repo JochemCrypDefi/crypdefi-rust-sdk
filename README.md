@@ -21,10 +21,10 @@ openssl pkey -in private_key_pkcs8.pem -pubout -out public_key.pem
 
 ## Examples
 
+### Instantiating a Bot
+
 ```rust
-// --------------------------- IMPORT ---------------------------
 use crypdefi_bot_sdk::crypdefi::user::Bot;
-use crypdefi_bot_sdk::crypdefi::SignatureRequestKind;
 use std::fs;
 
 // --------------------------- CONFIG ---------------------------
@@ -35,28 +35,38 @@ let wallet_id = "wa-0000000000-9f3542a65690ff697b85";
 // This is the bot's private key used to authenticate with CrypDefi (not the wallet's private key).
 let private_key_pem = fs::read_to_string("private_key_pkcs8.pem").expect("Failed to read private_key_pkcs8.pem");
 
-
-// --------------------------- INIT BOT ---------------------------
-println!("Initializing Bot...\n");
 let bot = Bot::new(String::from(private_key_pem), None).unwrap();
-   
+println!("Bot: {:?}", bot);
+
 // --------------------------- LOGIN WITH BOT ---------------------------
-println!("Logging in with Bot...");
 // if you turn off auto_refresh the bot will not automatically re-authenticate itself when its login-token is about to expire
 bot.login(
     user_id.to_string(),
     Some(false)
 ).await.unwrap();
- 
+
+```
+
+### Getting values from the Bot
+
+```rust
+// **Note:**  Bot should already be instantiated and logged in. 
+
 // --------------------------- Check for expiration time of AUTH ---------------------------
 let expiration = bot.auth_expiration_unix_time().await;
 println!("Expiration: {:?}\n", expiration);
- 
+
 // --------------------------- FETCH ASSOCIATED WALLETS ---------------------------
-println!("Fetching wallets associated with Bot...");
 let wallets = bot.get_wallets().await.unwrap();
 println!("Wallets: {:?}\n", wallets);
- 
+
+```
+
+### Bot Actions
+
+```rust
+// **Note:**  Bot should already be instantiated and logged in. 
+
 // --------------------------- CREATE & SIGN TRANSACTION ---------------------------
 println!("Preparing transaction to sign...\n");
 // Include steps to create transaction here. Replace hex below with the actual hex string of the transaction to sign.
@@ -79,9 +89,10 @@ println!("Refresh result: {:?}\n", refresh_result);
 // --------------------------- LOGOUT ---------------------------
 let logout_result = bot.logout().await.unwrap();
 println!("Logout result: {:?}", logout_result);
-```
 
-## DEVELOPMENT
+
+```
+## Contributors
 
 This are commands and tools for developers of the SDK.
 

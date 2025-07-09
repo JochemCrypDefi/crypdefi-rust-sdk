@@ -14,6 +14,8 @@ VfdMlG3IA6EhXb0a3TePDvWw6RqhRANCAAQfPDagIdi3luh8HaOBihcKqgaCsYsU
     )
     .unwrap();
 
+    println!("Bot: {:?}", bot);
+
     println!("loginging");
     bot.login(
         String::from("us-0000000000-1dcf6986e73a839391f1"),
