@@ -1,16 +1,9 @@
 use crate::error::BotSdkError;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::env;
 
 pub const DEFAULT_URL: &str = "https://api.release.crypdefi.eu";
-pub fn get_url_base(endpoint: String) -> String {
-    let key = "CRYPDEFI_BASE_URL";
-    let base_url = match env::var(key) {
-        Ok(val) => val,
-        Err(_) => DEFAULT_URL.to_string(),
-    };
-
+fn set_url(base_url: String, endpoint: String) -> String {
     let joinded_url: String = format!("{}{}", base_url, endpoint);
 
     return joinded_url;
@@ -29,8 +22,8 @@ pub struct LoginResponse {
 }
 
 /// makes login call to the crypdefi servers
-pub async fn login(req: LoginRequest) -> Result<LoginResponse, BotSdkError> {
-    let url = get_url_base("/auth/login".to_string());
+pub async fn login(req: LoginRequest, base_url: String) -> Result<LoginResponse, BotSdkError> {
+    let url = set_url(base_url, "/auth/login".to_string());
     let client = Client::new();
     let response = client.post(url).json(&req).send().await?;
 
@@ -69,8 +62,8 @@ pub struct CraResponse {
 }
 
 /// makes the cra login auth call to servers
-pub async fn cra_login(req: CraRequest) -> Result<CraResponse, BotSdkError> {
-    let url = get_url_base("/auth/cra".to_string());
+pub async fn cra_login(req: CraRequest, base_url: String) -> Result<CraResponse, BotSdkError> {
+    let url = set_url(base_url, "/auth/cra".to_string());
     let client = Client::new();
     let response = client.post(url).json(&req).send().await?;
 
@@ -125,13 +118,16 @@ pub struct Wallet {
 }
 
 /// makes call to get wallets from backend for user.
-pub async fn get_wallets(access_token_arc: &Option<String>) -> Result<Vec<Wallet>, BotSdkError> {
+pub async fn get_wallets(
+    access_token_arc: &Option<String>,
+    base_url: String,
+) -> Result<Vec<Wallet>, BotSdkError> {
     let access_token = match access_token_arc {
         Some(acc) => acc,
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = get_url_base("/wallets?accessOnly=true".to_string());
+    let url = set_url(base_url, "/wallets?accessOnly=true".to_string());
 
     let client = Client::new();
 
@@ -266,13 +262,14 @@ pub async fn sign(
     wallet_id: String,
     tx_type: SignatureRequestKind,
     hex: String,
+    base_url: String,
 ) -> Result<SigResponse, BotSdkError> {
     let access_token = match access_token_arc {
         Some(acc) => acc,
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = get_url_base(format!("/wallets/{}/sign", wallet_id));
+    let url = set_url(base_url, format!("/wallets/{}/sign", wallet_id));
 
     let client = Client::new();
 
@@ -308,13 +305,16 @@ pub async fn sign(
 }
 
 /// Request signature from keyvault passing hex transactions
-pub async fn logout(access_token_arc: &Option<String>) -> Result<(), BotSdkError> {
+pub async fn logout(
+    access_token_arc: &Option<String>,
+    base_url: String,
+) -> Result<(), BotSdkError> {
     let access_token = match access_token_arc {
         Some(acc) => acc,
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = get_url_base("/auth/logout".to_string());
+    let url = set_url(base_url, "/auth/logout".to_string());
 
     let client = Client::new();
 
@@ -347,6 +347,7 @@ struct RefreshRequest {
 pub async fn refresh_auth(
     refresh_token_opt: &Option<String>,
     access_token_opt: &Option<String>,
+    base_url: String,
 ) -> Result<CraResponse, BotSdkError> {
     let access_token = match access_token_opt {
         Some(acc) => acc,
@@ -357,7 +358,7 @@ pub async fn refresh_auth(
         None => return Err(BotSdkError::NoRefreshToken),
     };
 
-    let url = get_url_base("/auth/refresh".to_string());
+    let url = set_url(base_url, "/auth/refresh".to_string());
 
     let client = Client::new();
 

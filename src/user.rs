@@ -1,4 +1,6 @@
-use crate::http::{SigResponse, SignatureRequestKind, get_wallets, logout, refresh_auth, sign};
+use crate::http::{
+    self, SigResponse, SignatureRequestKind, get_wallets, logout, refresh_auth, sign,
+};
 use crate::{
     error::BotSdkError,
     http::{CraRequest, LoginRequest, Wallet, cra_login, login},
@@ -39,6 +41,7 @@ pub struct Bot {
     refresh_cancel_receiver: watch::Receiver<bool>,
     /// unix timestamp on when the token expires
     refresh_expiration_time: Arc<RwLock<Option<u64>>>,
+    base_url: String,
 }
 
 impl Bot {
@@ -52,12 +55,20 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    ///let bot = Bot::new(priv_key).await.unwrap();
+    ///let bot = Bot::new(priv_key, None).await.unwrap();
+    ///
+    /// NOTE: unless changed endpoint will default to: https://api.release.crypdefi.eu.  
     /// ```
-    pub fn new(pem_key: String) -> Result<Arc<Self>, BotSdkError> {
+    pub fn new(pem_key: String, base_url: Option<String>) -> Result<Arc<Self>, BotSdkError> {
         let signing_key = SigningKey::from_pkcs8_pem(pem_key.as_str())?;
 
         let (cancel_tx, cancel_rx) = watch::channel(false);
+
+        let mut final_base_url = String::from(http::DEFAULT_URL);
+
+        if let Some(url) = base_url {
+            final_base_url = url;
+        }
 
         Ok(Arc::new(Self {
             private_cert: signing_key,
@@ -70,6 +81,7 @@ impl Bot {
             refresh_cancel_sender: Arc::new(cancel_tx),
             refresh_cancel_receiver: cancel_rx,
             refresh_expiration_time: Arc::new(RwLock::new(None)),
+            base_url: final_base_url,
         }))
     }
 
@@ -83,7 +95,7 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key).unwrap();
+    /// let bot = Bot::new(priv_key, None).unwrap();
     ///
     /// NOTE: By default the bot will auto_refresh login
     /// bot.login(String::from("us-0000000000-fbf17c83704f04af11c6"), None).await.unwrap();
@@ -120,7 +132,7 @@ impl Bot {
         }
         drop(auto_refresh_lock);
 
-        let response = login(login_req).await?;
+        let response = login(login_req, self.base_url.clone()).await?;
 
         let challenge_bytes = hex::decode(response.challenge.clone())?;
 
@@ -138,7 +150,7 @@ impl Bot {
             hash_algorithm: "sha256".to_string(),
         };
 
-        let cra_response = cra_login(login_req).await?;
+        let cra_response = cra_login(login_req, self.base_url.clone()).await?;
 
         // Store tokens
         let mut access_lock = self.access_token.write().await;
@@ -173,7 +185,7 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key).await.unwrap();
+    /// let bot = Bot::new(priv_key, None).await.unwrap();
     /// bot.refresh().unwrap
     /// ```
     ///
@@ -181,7 +193,7 @@ impl Bot {
     pub async fn refresh(&self) -> Result<(), BotSdkError> {
         let access_lock = self.access_token.read().await;
         let refresh_lock = self.refresh_token.read().await;
-        let response = refresh_auth(&refresh_lock, &access_lock).await?;
+        let response = refresh_auth(&refresh_lock, &access_lock, self.base_url.clone()).await?;
 
         drop(access_lock);
         drop(refresh_lock);
@@ -222,7 +234,7 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key).unwrap();
+    /// let bot = Bot::new(priv_key, None).unwrap();
     /// let wallets = bot.get_wallets().await.unwrap();
     /// println!("wallets: {:?}", wallets);
     /// ```
@@ -230,7 +242,7 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub async fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
         let access_lock = self.access_token.read().await;
-        let wallets = get_wallets(&*access_lock).await?;
+        let wallets = get_wallets(&*access_lock, self.base_url.clone()).await?;
 
         let mut wallets_lock = self.wallets.write().await;
         *wallets_lock = wallets.clone();
@@ -248,7 +260,7 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key).unwrap();
+    /// let bot = Bot::new(priv_key, None).unwrap();
     ///
     /// let wallet_id = "wa-0000000000-4f45f9d208e9207736fb".to_string();
     /// let transaction_hex = "02f8af01018390f560850461933067828cb394a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4880b844095ea7b300000000000000000000000097802f38a37e1d789eba194513e3eb7e918d34df000000000000000000000000000000000000000000000000000000001dcd6500c001a0ad0b4a87309ef94b96d38f145d676d971ca1f1e4702c9cace99fdec8df4a8814a008651a171f31629bcf3a686ca26b9d3cece44c6dfec39fb2c1848e3b290ba121".to_string();
@@ -263,7 +275,14 @@ impl Bot {
         hex_value: String,
     ) -> Result<SigResponse, BotSdkError> {
         let access_lock = self.access_token.read().await;
-        let signature = sign(&*access_lock, wallet_id, tx_type, hex_value).await?;
+        let signature = sign(
+            &*access_lock,
+            wallet_id,
+            tx_type,
+            hex_value,
+            self.base_url.clone(),
+        )
+        .await?;
 
         return Ok(signature);
     }
@@ -278,7 +297,7 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key).unwrap();
+    /// let bot = Bot::new(priv_key, None).unwrap();
     ///
     /// bot.logout().await.unwrap();
     /// ```
@@ -287,7 +306,7 @@ impl Bot {
     pub async fn logout(&self) -> Result<(), BotSdkError> {
         self.cancel_refresh_task().await;
         let access_lock = self.access_token.read().await;
-        let res = logout(&*access_lock).await?;
+        let res = logout(&*access_lock, self.base_url.clone()).await?;
         drop(access_lock);
         let mut access_lock = self.access_token.write().await;
         *access_lock = None;
@@ -312,6 +331,7 @@ impl Bot {
         let refresh_expiration_time = Arc::clone(&self.refresh_expiration_time);
         let mut cancel_receiver = self.refresh_cancel_receiver.clone();
 
+        let base_url_copy = self.base_url.clone();
         let handle = tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -326,7 +346,7 @@ impl Bot {
                         let refresh_lock = refresh_token.read().await;
                         let expiration_time_lock = refresh_expiration_time.read().await;
 
-                        match refresh_auth(&refresh_lock, &access_lock).await {
+                        match refresh_auth(&refresh_lock, &access_lock, base_url_copy.clone()).await {
                             Ok(response) => {
                                 drop(access_lock);
                                 drop(refresh_lock);
@@ -381,7 +401,7 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key).unwrap();
+    /// let bot = Bot::new(priv_key, None).unwrap();
     ///
     /// bot.auth_expiration_unix_time().await;
     /// ```

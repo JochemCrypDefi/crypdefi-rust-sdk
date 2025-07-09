@@ -2,13 +2,16 @@ use crypdefi_bot_sdk::{error::BotSdkError, http::SignatureRequestKind, user::Bot
 
 #[tokio::main]
 async fn main() -> Result<(), BotSdkError> {
-    let bot = Bot::new(String::from(
-        "-----BEGIN PRIVATE KEY-----
+    let bot = Bot::new(
+        String::from(
+            "-----BEGIN PRIVATE KEY-----
 MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgT/x59Xqj/UnxmiO0
 VfdMlG3IA6EhXb0a3TePDvWw6RqhRANCAAQfPDagIdi3luh8HaOBihcKqgaCsYsU
 6hpCDdXZruL5+EnOhscqQQqRhJ0zIeCeIBR6oTHOFhVVkzE6Dw9JeArx
 -----END PRIVATE KEY-----",
-    ))
+        ),
+        Some(String::from("https://api.sandbox.crypdefi.eu")),
+    )
     .unwrap();
 
     println!("loginging");

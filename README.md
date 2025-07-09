@@ -35,11 +35,10 @@ let wallet_id = "wa-0000000000-9f3542a65690ff697b85";
 // This is the bot's private key used to authenticate with CrypDefi (not the wallet's private key).
 let private_key_pem = fs::read_to_string("private_key_pkcs8.pem").expect("Failed to read private_key_pkcs8.pem");
 
-// NOTE: If you want to change the backend endpoint you will need to set the env variable: CRYPDEFI_BASE_URL
 
 // --------------------------- INIT BOT ---------------------------
 println!("Initializing Bot...\n");
-let bot = Bot::new(String::from(private_key_pem)).unwrap();
+let bot = Bot::new(String::from(private_key_pem), None).unwrap();
    
 // --------------------------- LOGIN WITH BOT ---------------------------
 println!("Logging in with Bot...");
@@ -88,7 +87,7 @@ This are commands and tools for developers of the SDK.
 
 You will need to have the static library somewhere in the file system.
 
-### Building libray locally
+### Building library locally
 Run: 
 ```bash
 cargo build
