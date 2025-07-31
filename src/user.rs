@@ -8,6 +8,7 @@ use crate::{
 use p256::ecdsa::{DerSignature, SigningKey, signature::Signer};
 use p256::ecdsa::{VerifyingKey, signature::Verifier};
 use pkcs8::{DecodePrivateKey, der::Encode};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{RwLock, watch};
@@ -34,7 +35,7 @@ pub struct Bot {
     private_cert: SigningKey,
     access_token: Arc<RwLock<Option<String>>>,
     refresh_token: Arc<RwLock<Option<String>>>,
-    auto_refresh_enabled: Arc<RwLock<bool>>,
+    auto_refresh_enabled: Arc<AtomicBool>,
 
     refresh_handle: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
     refresh_cancel_sender: Arc<watch::Sender<bool>>,
@@ -75,7 +76,7 @@ impl Bot {
             access_token: Arc::new(RwLock::new(None)),
             refresh_token: Arc::new(RwLock::new(None)),
             wallets: Arc::new(RwLock::new(Vec::new())),
-            auto_refresh_enabled: Arc::new(RwLock::new(true)),
+            auto_refresh_enabled: Arc::new(AtomicBool::new(true)),
 
             refresh_handle: Arc::new(RwLock::new(None)),
             refresh_cancel_sender: Arc::new(cancel_tx),
@@ -126,11 +127,9 @@ impl Bot {
         // Cancel any existing refresh task
         self.cancel_refresh_task().await;
 
-        let mut auto_refresh_lock = self.auto_refresh_enabled.write().await;
-        if let Some(auto) = auto_refresh {
-            *auto_refresh_lock = auto;
+        if let Some(auto_refresh_value) = auto_refresh {
+            self.auto_refresh_enabled.store(auto_refresh_value, Ordering::Relaxed);
         }
-        drop(auto_refresh_lock);
 
         let response = login(login_req, self.base_url.clone()).await?;
 
@@ -147,7 +146,7 @@ impl Bot {
             user_id,
             challenge: response.challenge,
             response: hex_signed_challenge,
-            hash_algorithm: "sha256".to_string(),
+            hash_algorithm: http::HashAlgo::Sha256,
         };
 
         let cra_response = cra_login(login_req, self.base_url.clone()).await?;
@@ -166,9 +165,7 @@ impl Bot {
         drop(refresh_time_lock);
 
         // Start refresh task if auto_refresh is enabled
-        let auto_refresh_enabled = self.auto_refresh_enabled.read().await;
-        if *auto_refresh_enabled {
-            drop(auto_refresh_enabled);
+        if self.auto_refresh_enabled.load(Ordering::Relaxed) {
             self.start_refresh_task(cra_response.seconds - 10).await?;
         }
 
@@ -209,10 +206,7 @@ impl Bot {
         drop(refresh_time_lock);
 
         // if autorefresh is true we restart the watcher thread.
-        let auto_refresh_enabled = self.auto_refresh_enabled.read().await;
-        if *auto_refresh_enabled {
-            drop(auto_refresh_enabled);
-
+        if self.auto_refresh_enabled.load(Ordering::Relaxed) {
             // Cancel the existing refresh thread and make a new one
             self.refresh_cancel_sender
                 .send(true)
@@ -336,11 +330,10 @@ impl Bot {
             loop {
                 tokio::select! {
                     _ = tokio::time::sleep(Duration::from_secs(seconds)) => {
-                        let enabled = auto_refresh_enabled.read().await;
-                        if !*enabled {
+                        let enabled = auto_refresh_enabled.load(Ordering::Relaxed);
+                        if !enabled {
                             break;
                         }
-                        drop(enabled);
 
                         let access_lock = access_token.read().await;
                         let refresh_lock = refresh_token.read().await;

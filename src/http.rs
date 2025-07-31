@@ -9,12 +9,20 @@ fn set_url(base_url: String, endpoint: String) -> String {
     return joinded_url;
 }
 
+
+#[derive(Serialize)]
+pub enum AuthMethod {
+    #[serde(rename(serialize = "cra"))]
+    Cra, 
+}
 #[derive(Serialize)]
 pub struct LoginRequest {
     pub organization: String,
     pub user_id: String,
     pub auth_method: String,
 }
+
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LoginResponse {
     pub challenge: String,
@@ -29,8 +37,7 @@ pub async fn login(req: LoginRequest, base_url: String) -> Result<LoginResponse,
 
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text)?;
-        let res = serde_json::from_value::<LoginResponse>(v)?;
+        let res = serde_json::from_str::<LoginResponse>(&text)?;
         return Ok(res);
     }
 
@@ -46,11 +53,17 @@ pub async fn login(req: LoginRequest, base_url: String) -> Result<LoginResponse,
 }
 
 #[derive(Serialize)]
+pub enum HashAlgo {
+    #[serde(rename(serialize = "sha256"))]
+    Sha256
+}
+
+#[derive(Serialize)]
 pub struct CraRequest {
     pub user_id: String,
     pub challenge: String,
     pub response: String,
-    pub hash_algorithm: String,
+    pub hash_algorithm: HashAlgo,
 }
 
 #[derive(Deserialize, Debug)]
@@ -69,8 +82,7 @@ pub async fn cra_login(req: CraRequest, base_url: String) -> Result<CraResponse,
 
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text)?;
-        let res = serde_json::from_value::<CraResponse>(v)?;
+        let res = serde_json::from_str::<CraResponse>(&text)?;
         return Ok(res);
     }
 
@@ -139,8 +151,7 @@ pub async fn get_wallets(
 
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text)?;
-        let res = serde_json::from_value::<Vec<Wallet>>(v)?;
+        let res = serde_json::from_str::<Vec<Wallet>>(&text)?;
         return Ok(res);
     }
 
@@ -172,6 +183,27 @@ pub struct Signature {
     recovery_id: Option<u64>,
 }
 
+fn encode_integer(bytes: &[u8]) -> Vec<u8> {
+    let mut result = Vec::new();
+    result.push(0x02); // Integer tag
+
+    // Remove leading zeros, but ensure at least one byte remains
+    let mut trimmed = bytes;
+    while trimmed.len() > 1 && trimmed[0] == 0 {
+        trimmed = &trimmed[1..];
+    }
+
+    // If the first bit is 1, prepend a 0x00 to avoid interpreting as negative
+    if trimmed[0] & 0x80 != 0 {
+        result.push((trimmed.len() + 1) as u8); // Length includes the extra 0x00
+        result.push(0x00);
+    } else {
+        result.push(trimmed.len() as u8); // Length of the integer
+    }
+
+    result.extend_from_slice(trimmed);
+    result
+}
 impl Signature {
     pub fn to_der(&self) -> Result<Vec<u8>, BotSdkError> {
         // Convert hex strings to byte vectors
@@ -180,42 +212,20 @@ impl Signature {
         let s_bytes = hex::decode(&self.s)?;
 
         // Ensure r and s are properly padded or trimmed for DER encoding
-        let r_der = self.encode_integer(&r_bytes);
-        let s_der = self.encode_integer(&s_bytes);
+        let r_der = encode_integer(&r_bytes);
+        let s_der = encode_integer(&s_bytes);
 
         // Construct the sequence: 0x30 (sequence tag) + length + r_der + s_der
-        let mut der = Vec::new();
-        der.push(0x30); // Sequence tag
-
         let total_length = r_der.len() + s_der.len();
+        let mut der = Vec::with_capacity(total_length + 2);
+        
+        der.push(0x30); // Sequence tag
         der.push(total_length as u8); // Length of the sequence
-
+        
         der.extend_from_slice(&r_der);
         der.extend_from_slice(&s_der);
 
         Ok(der)
-    }
-
-    fn encode_integer(&self, bytes: &[u8]) -> Vec<u8> {
-        let mut result = Vec::new();
-        result.push(0x02); // Integer tag
-
-        // Remove leading zeros, but ensure at least one byte remains
-        let mut trimmed = bytes;
-        while trimmed.len() > 1 && trimmed[0] == 0 {
-            trimmed = &trimmed[1..];
-        }
-
-        // If the first bit is 1, prepend a 0x00 to avoid interpreting as negative
-        if trimmed[0] & 0x80 != 0 {
-            result.push((trimmed.len() + 1) as u8); // Length includes the extra 0x00
-            result.push(0x00);
-        } else {
-            result.push(trimmed.len() as u8); // Length of the integer
-        }
-
-        result.extend_from_slice(trimmed);
-        result
     }
 }
 
@@ -288,8 +298,7 @@ pub async fn sign(
 
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text)?;
-        let res = serde_json::from_value::<SigResponse>(v)?;
+        let res = serde_json::from_str::<SigResponse>(&text)?;
         return Ok(res);
     }
 
@@ -374,8 +383,7 @@ pub async fn refresh_auth(
         .await?;
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text)?;
-        let res = serde_json::from_value::<CraResponse>(v)?;
+        let res = serde_json::from_str::<CraResponse>(&text)?;
         return Ok(res);
     }
 
