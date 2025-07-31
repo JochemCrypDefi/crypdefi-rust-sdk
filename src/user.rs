@@ -8,10 +8,10 @@ use crate::{
 use p256::ecdsa::{DerSignature, SigningKey, signature::Signer};
 use p256::ecdsa::{VerifyingKey, signature::Verifier};
 use pkcs8::{DecodePrivateKey, der::Encode};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tokio::sync::{RwLock, watch};
+use tokio::sync::RwLock;
 
 fn sign_challenge_with_ecdsa(
     signing_key: SigningKey,
@@ -38,8 +38,6 @@ pub struct Bot {
     auto_refresh_enabled: Arc<AtomicBool>,
 
     refresh_handle: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
-    refresh_cancel_sender: Arc<watch::Sender<bool>>,
-    refresh_cancel_receiver: watch::Receiver<bool>,
     /// unix timestamp on when the token expires
     refresh_expiration_time: Arc<RwLock<Option<u64>>>,
     base_url: String,
@@ -63,8 +61,6 @@ impl Bot {
     pub fn new(pem_key: String, base_url: Option<String>) -> Result<Arc<Self>, BotSdkError> {
         let signing_key = SigningKey::from_pkcs8_pem(pem_key.as_str())?;
 
-        let (cancel_tx, cancel_rx) = watch::channel(false);
-
         let mut final_base_url = String::from(http::DEFAULT_URL);
 
         if let Some(url) = base_url {
@@ -79,8 +75,6 @@ impl Bot {
             auto_refresh_enabled: Arc::new(AtomicBool::new(true)),
 
             refresh_handle: Arc::new(RwLock::new(None)),
-            refresh_cancel_sender: Arc::new(cancel_tx),
-            refresh_cancel_receiver: cancel_rx,
             refresh_expiration_time: Arc::new(RwLock::new(None)),
             base_url: final_base_url,
         }))
@@ -128,7 +122,8 @@ impl Bot {
         self.cancel_refresh_task().await;
 
         if let Some(auto_refresh_value) = auto_refresh {
-            self.auto_refresh_enabled.store(auto_refresh_value, Ordering::Relaxed);
+            self.auto_refresh_enabled
+                .store(auto_refresh_value, Ordering::Relaxed);
         }
 
         let response = login(login_req, self.base_url.clone()).await?;
@@ -208,9 +203,12 @@ impl Bot {
         // if autorefresh is true we restart the watcher thread.
         if self.auto_refresh_enabled.load(Ordering::Relaxed) {
             // Cancel the existing refresh thread and make a new one
-            self.refresh_cancel_sender
-                .send(true)
-                .map_err(|_| BotSdkError::Custom("Failed to send cancel signal".to_string()))?;
+            let mut handle_lock = self.refresh_handle.write().await;
+            if let Some(handle) = handle_lock.take() {
+                handle.abort();
+                let _ = handle.await;
+            }
+            drop(handle_lock);
 
             self.start_refresh_task(response.seconds - 10).await?;
         }
@@ -315,15 +313,17 @@ impl Bot {
 
     /// This watches for refresh
     async fn start_refresh_task(&self, seconds: u64) -> Result<(), BotSdkError> {
-        self.refresh_cancel_sender
-            .send(false)
-            .map_err(|_| BotSdkError::Custom("Failed to reset cancel signal".to_string()))?;
+        let mut handle_lock = self.refresh_handle.write().await;
+        if let Some(handle) = handle_lock.take() {
+            handle.abort();
+            let _ = handle.await;
+        }
+        drop(handle_lock);
 
         let auto_refresh_enabled = Arc::clone(&self.auto_refresh_enabled);
         let access_token = Arc::clone(&self.access_token);
         let refresh_token = Arc::clone(&self.refresh_token);
         let refresh_expiration_time = Arc::clone(&self.refresh_expiration_time);
-        let mut cancel_receiver = self.refresh_cancel_receiver.clone();
 
         let base_url_copy = self.base_url.clone();
         let handle = tokio::spawn(async move {
@@ -360,12 +360,6 @@ impl Bot {
                             }
                         }
                     }
-                    _ = cancel_receiver.changed() => {
-                        if *cancel_receiver.borrow() {
-                            println!("stoping thread watching for refresh...");
-                            break;
-                        }
-                    }
                 }
             }
         });
@@ -376,10 +370,9 @@ impl Bot {
         Ok(())
     }
     async fn cancel_refresh_task(&self) {
-        let _ = self.refresh_cancel_sender.send(true);
-
         let mut handle_lock = self.refresh_handle.write().await;
         if let Some(handle) = handle_lock.take() {
+            handle.abort();
             let _ = handle.await;
         }
     }

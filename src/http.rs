@@ -9,11 +9,10 @@ fn set_url(base_url: String, endpoint: String) -> String {
     return joinded_url;
 }
 
-
 #[derive(Serialize)]
 pub enum AuthMethod {
     #[serde(rename(serialize = "cra"))]
-    Cra, 
+    Cra,
 }
 #[derive(Serialize)]
 pub struct LoginRequest {
@@ -21,7 +20,6 @@ pub struct LoginRequest {
     pub user_id: String,
     pub auth_method: String,
 }
-
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LoginResponse {
@@ -55,7 +53,7 @@ pub async fn login(req: LoginRequest, base_url: String) -> Result<LoginResponse,
 #[derive(Serialize)]
 pub enum HashAlgo {
     #[serde(rename(serialize = "sha256"))]
-    Sha256
+    Sha256,
 }
 
 #[derive(Serialize)]
@@ -218,10 +216,10 @@ impl Signature {
         // Construct the sequence: 0x30 (sequence tag) + length + r_der + s_der
         let total_length = r_der.len() + s_der.len();
         let mut der = Vec::with_capacity(total_length + 2);
-        
+
         der.push(0x30); // Sequence tag
         der.push(total_length as u8); // Length of the sequence
-        
+
         der.extend_from_slice(&r_der);
         der.extend_from_slice(&s_der);
 
