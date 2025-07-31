@@ -41,6 +41,7 @@ pub struct Bot {
     /// unix timestamp on when the token expires
     refresh_expiration_time: Arc<RwLock<Option<u64>>>,
     base_url: String,
+    rest_client: Arc<reqwest::Client>,
 }
 
 impl Bot {
@@ -67,6 +68,13 @@ impl Bot {
             final_base_url = url;
         }
 
+        let rest_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .http2_keep_alive_interval(Duration::from_secs(5))
+            .http2_keep_alive_timeout(Duration::from_secs(2))
+            .http2_keep_alive_while_idle(true)
+            .build()?;
+
         Ok(Arc::new(Self {
             private_cert: signing_key,
             access_token: Arc::new(RwLock::new(None)),
@@ -77,6 +85,7 @@ impl Bot {
             refresh_handle: Arc::new(RwLock::new(None)),
             refresh_expiration_time: Arc::new(RwLock::new(None)),
             base_url: final_base_url,
+            rest_client: Arc::new(rest_client),
         }))
     }
 
@@ -126,7 +135,7 @@ impl Bot {
                 .store(auto_refresh_value, Ordering::Relaxed);
         }
 
-        let response = login(login_req, self.base_url.clone()).await?;
+        let response = login(&self.rest_client, login_req, self.base_url.clone()).await?;
 
         let challenge_bytes = hex::decode(response.challenge.clone())?;
 
@@ -144,7 +153,7 @@ impl Bot {
             hash_algorithm: http::HashAlgo::Sha256,
         };
 
-        let cra_response = cra_login(login_req, self.base_url.clone()).await?;
+        let cra_response = cra_login(&self.rest_client, login_req, self.base_url.clone()).await?;
 
         // Store tokens
         let mut access_lock = self.access_token.write().await;
@@ -185,7 +194,13 @@ impl Bot {
     pub async fn refresh(&self) -> Result<(), BotSdkError> {
         let access_lock = self.access_token.read().await;
         let refresh_lock = self.refresh_token.read().await;
-        let response = refresh_auth(&refresh_lock, &access_lock, self.base_url.clone()).await?;
+        let response = refresh_auth(
+            &self.rest_client,
+            &refresh_lock,
+            &access_lock,
+            self.base_url.clone(),
+        )
+        .await?;
 
         drop(access_lock);
         drop(refresh_lock);
@@ -234,7 +249,7 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub async fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
         let access_lock = self.access_token.read().await;
-        let wallets = get_wallets(&*access_lock, self.base_url.clone()).await?;
+        let wallets = get_wallets(&self.rest_client, &*access_lock, self.base_url.clone()).await?;
 
         let mut wallets_lock = self.wallets.write().await;
         *wallets_lock = wallets.clone();
@@ -268,7 +283,8 @@ impl Bot {
     ) -> Result<SigResponse, BotSdkError> {
         let access_lock = self.access_token.read().await;
         let signature = sign(
-            &*access_lock,
+            &self.rest_client,
+            &access_lock,
             wallet_id,
             tx_type,
             hex_value,
@@ -298,7 +314,7 @@ impl Bot {
     pub async fn logout(&self) -> Result<(), BotSdkError> {
         self.cancel_refresh_task().await;
         let access_lock = self.access_token.read().await;
-        let res = logout(&*access_lock, self.base_url.clone()).await?;
+        let res = logout(&self.rest_client, &*access_lock, self.base_url.clone()).await?;
         drop(access_lock);
         let mut access_lock = self.access_token.write().await;
         *access_lock = None;
@@ -325,6 +341,8 @@ impl Bot {
         let refresh_token = Arc::clone(&self.refresh_token);
         let refresh_expiration_time = Arc::clone(&self.refresh_expiration_time);
 
+        let rest_client_clone = Arc::clone(&self.rest_client);
+
         let base_url_copy = self.base_url.clone();
         let handle = tokio::spawn(async move {
             loop {
@@ -339,7 +357,7 @@ impl Bot {
                         let refresh_lock = refresh_token.read().await;
                         let expiration_time_lock = refresh_expiration_time.read().await;
 
-                        match refresh_auth(&refresh_lock, &access_lock, base_url_copy.clone()).await {
+                        match refresh_auth(&rest_client_clone, &refresh_lock, &access_lock, base_url_copy.clone()).await {
                             Ok(response) => {
                                 drop(access_lock);
                                 drop(refresh_lock);

@@ -1,5 +1,4 @@
 use crate::error::BotSdkError;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_URL: &str = "https://api.release.crypdefi.eu";
@@ -28,9 +27,12 @@ pub struct LoginResponse {
 }
 
 /// makes login call to the crypdefi servers
-pub async fn login(req: LoginRequest, base_url: String) -> Result<LoginResponse, BotSdkError> {
+pub async fn login(
+    client: &reqwest::Client,
+    req: LoginRequest,
+    base_url: String,
+) -> Result<LoginResponse, BotSdkError> {
     let url = set_url(base_url, "/auth/login".to_string());
-    let client = Client::new();
     let response = client.post(url).json(&req).send().await?;
 
     if response.status().is_success() {
@@ -73,9 +75,12 @@ pub struct CraResponse {
 }
 
 /// makes the cra login auth call to servers
-pub async fn cra_login(req: CraRequest, base_url: String) -> Result<CraResponse, BotSdkError> {
+pub async fn cra_login(
+    client: &reqwest::Client,
+    req: CraRequest,
+    base_url: String,
+) -> Result<CraResponse, BotSdkError> {
     let url = set_url(base_url, "/auth/cra".to_string());
-    let client = Client::new();
     let response = client.post(url).json(&req).send().await?;
 
     if response.status().is_success() {
@@ -129,6 +134,7 @@ pub struct Wallet {
 
 /// makes call to get wallets from backend for user.
 pub async fn get_wallets(
+    client: &reqwest::Client,
     access_token_arc: &Option<String>,
     base_url: String,
 ) -> Result<Vec<Wallet>, BotSdkError> {
@@ -138,8 +144,6 @@ pub async fn get_wallets(
     };
 
     let url = set_url(base_url, "/wallets?accessOnly=true".to_string());
-
-    let client = Client::new();
 
     let response = client
         .get(url)
@@ -266,6 +270,7 @@ pub enum SignatureRequestKind {
 
 /// Request signature from keyvault passing hex transactions
 pub async fn sign(
+    client: &reqwest::Client,
     access_token_arc: &Option<String>,
     wallet_id: String,
     tx_type: SignatureRequestKind,
@@ -278,8 +283,6 @@ pub async fn sign(
     };
 
     let url = set_url(base_url, format!("/wallets/{}/sign", wallet_id));
-
-    let client = Client::new();
 
     let req = SignRequest {
         kind: tx_type,
@@ -313,6 +316,7 @@ pub async fn sign(
 
 /// Request signature from keyvault passing hex transactions
 pub async fn logout(
+    client: &reqwest::Client,
     access_token_arc: &Option<String>,
     base_url: String,
 ) -> Result<(), BotSdkError> {
@@ -322,8 +326,6 @@ pub async fn logout(
     };
 
     let url = set_url(base_url, "/auth/logout".to_string());
-
-    let client = Client::new();
 
     let response = client
         .post(url)
@@ -352,6 +354,7 @@ struct RefreshRequest {
 
 /// Make call to try to refresh the access token
 pub async fn refresh_auth(
+    client: &reqwest::Client,
     refresh_token_opt: &Option<String>,
     access_token_opt: &Option<String>,
     base_url: String,
@@ -366,8 +369,6 @@ pub async fn refresh_auth(
     };
 
     let url = set_url(base_url, "/auth/refresh".to_string());
-
-    let client = Client::new();
 
     let req_body: RefreshRequest = RefreshRequest {
         refresh_token: refresh_token.clone(),
