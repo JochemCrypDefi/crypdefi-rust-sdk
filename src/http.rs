@@ -29,7 +29,7 @@ pub async fn login(req: LoginRequest, base_url: String) -> Result<LoginResponse,
 
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text)?;
         let res = serde_json::from_value::<LoginResponse>(v)?;
         return Ok(res);
     }
@@ -69,7 +69,7 @@ pub async fn cra_login(req: CraRequest, base_url: String) -> Result<CraResponse,
 
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text)?;
         let res = serde_json::from_value::<CraResponse>(v)?;
         return Ok(res);
     }
@@ -139,7 +139,7 @@ pub async fn get_wallets(
 
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text)?;
         let res = serde_json::from_value::<Vec<Wallet>>(v)?;
         return Ok(res);
     }
@@ -288,7 +288,7 @@ pub async fn sign(
 
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text)?;
         let res = serde_json::from_value::<SigResponse>(v)?;
         return Ok(res);
     }
@@ -374,7 +374,7 @@ pub async fn refresh_auth(
         .await?;
     if response.status().is_success() {
         let text = response.text().await?;
-        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text)?;
         let res = serde_json::from_value::<CraResponse>(v)?;
         return Ok(res);
     }
