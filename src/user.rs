@@ -123,7 +123,7 @@ impl Bot {
 
         if user_iter.next().is_none() {
             return Err(BotSdkError::InvalidUserId);
-        } 
+        }
 
         let login_req = LoginRequest {
             organization: organization.to_string(),
@@ -221,7 +221,6 @@ impl Bot {
 
         // if autorefresh is true we restart the watcher thread.
         if self.auto_refresh_enabled.load(Ordering::Relaxed) {
-
             self.start_refresh_task(response.seconds - 10).await?;
         }
 

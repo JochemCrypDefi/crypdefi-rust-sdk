@@ -255,16 +255,12 @@ pub struct SigResponse {
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SignatureRequestKind {
-    #[serde(rename = "raw")]
     Raw,
-    #[serde(rename = "transaction")]
     Transaction,
-    #[serde(rename = "message")]
     Message,
-    #[serde(rename = "rdx_authentication_request")]
     RdxAuthenticationRequest,
-    #[serde(rename = "evm_eip712")]
     EvmEip712,
 }
 
