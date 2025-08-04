@@ -111,18 +111,22 @@ impl Bot {
         user_id: String,
         auto_refresh: Option<bool>,
     ) -> Result<(), BotSdkError> {
-        let user_iter: Vec<&str> = user_id.split("-").collect();
+        let mut user_iter = user_id.split("-");
 
-        if user_iter.len() < 3 {
-            return Err(BotSdkError::InvalidUserId);
-        }
-
-        if user_iter[0] != "us" {
+        if user_iter.next() != Some("us") {
             return Err(BotSdkError::IdNotUserId);
         }
 
+        let Some(organization) = user_iter.next() else {
+            return Err(BotSdkError::InvalidUserId);
+        };
+
+        if user_iter.next().is_none() {
+            return Err(BotSdkError::InvalidUserId);
+        } 
+
         let login_req = LoginRequest {
-            organization: user_iter[1].to_string(),
+            organization: organization.to_string(),
             user_id: user_id.clone(),
             auth_method: "cra".to_string(),
         };
