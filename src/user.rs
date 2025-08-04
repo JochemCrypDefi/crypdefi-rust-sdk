@@ -221,13 +221,6 @@ impl Bot {
 
         // if autorefresh is true we restart the watcher thread.
         if self.auto_refresh_enabled.load(Ordering::Relaxed) {
-            // Cancel the existing refresh thread and make a new one
-            let mut handle_lock = self.refresh_handle.write().await;
-            if let Some(handle) = handle_lock.take() {
-                handle.abort();
-                let _ = handle.await;
-            }
-            drop(handle_lock);
 
             self.start_refresh_task(response.seconds - 10).await?;
         }
@@ -333,12 +326,7 @@ impl Bot {
 
     /// This watches for refresh
     async fn start_refresh_task(&self, seconds: u64) -> Result<(), BotSdkError> {
-        let mut handle_lock = self.refresh_handle.write().await;
-        if let Some(handle) = handle_lock.take() {
-            handle.abort();
-            let _ = handle.await;
-        }
-        drop(handle_lock);
+        self.cancel_refresh_task().await;
 
         let auto_refresh_enabled = Arc::clone(&self.auto_refresh_enabled);
         let access_token = Arc::clone(&self.access_token);
@@ -396,6 +384,7 @@ impl Bot {
         if let Some(handle) = handle_lock.take() {
             handle.abort();
             let _ = handle.await;
+            *handle_lock = None;
         }
     }
 
