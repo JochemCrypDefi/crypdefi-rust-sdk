@@ -41,7 +41,7 @@ pub struct Bot {
     /// unix timestamp on when the token expires
     refresh_expiration_time: Arc<RwLock<Option<u64>>>,
     base_url: String,
-    rest_client: Arc<reqwest::Client>,
+    rest_client: reqwest::Client,
 }
 
 impl Bot {
@@ -85,7 +85,7 @@ impl Bot {
             refresh_handle: Arc::new(RwLock::new(None)),
             refresh_expiration_time: Arc::new(RwLock::new(None)),
             base_url: final_base_url,
-            rest_client: Arc::new(rest_client),
+            rest_client: rest_client,
         }))
     }
 
@@ -327,47 +327,44 @@ impl Bot {
     async fn start_refresh_task(&self, seconds: u64) -> Result<(), BotSdkError> {
         self.cancel_refresh_task().await;
 
-        let auto_refresh_enabled = Arc::clone(&self.auto_refresh_enabled);
         let access_token = Arc::clone(&self.access_token);
         let refresh_token = Arc::clone(&self.refresh_token);
         let refresh_expiration_time = Arc::clone(&self.refresh_expiration_time);
-
-        let rest_client_clone = Arc::clone(&self.rest_client);
+        let rest_client_clone = self.rest_client.clone();
 
         let base_url_copy = self.base_url.clone();
         let handle = tokio::spawn(async move {
             loop {
-                tokio::select! {
-                    _ = tokio::time::sleep(Duration::from_secs(seconds)) => {
-                        let enabled = auto_refresh_enabled.load(Ordering::Relaxed);
-                        if !enabled {
-                            break;
-                        }
+                tokio::time::sleep(Duration::from_secs(seconds)).await;
+                let access_lock = access_token.read().await;
+                let refresh_lock = refresh_token.read().await;
+                let expiration_time_lock = refresh_expiration_time.read().await;
 
-                        let access_lock = access_token.read().await;
-                        let refresh_lock = refresh_token.read().await;
-                        let expiration_time_lock = refresh_expiration_time.read().await;
+                match refresh_auth(
+                    &rest_client_clone,
+                    &refresh_lock,
+                    &access_lock,
+                    &base_url_copy,
+                )
+                .await
+                {
+                    Ok(response) => {
+                        drop(access_lock);
+                        drop(refresh_lock);
+                        drop(expiration_time_lock);
 
-                        match refresh_auth(&rest_client_clone, &refresh_lock, &access_lock, &base_url_copy).await {
-                            Ok(response) => {
-                                drop(access_lock);
-                                drop(refresh_lock);
-                                drop(expiration_time_lock);
+                        let mut access_lock = access_token.write().await;
+                        *access_lock = Some(response.token);
 
-                                let mut access_lock = access_token.write().await;
-                                *access_lock = Some(response.token);
+                        let mut refresh_lock = refresh_token.write().await;
+                        *refresh_lock = Some(response.refresh_token);
 
-                                let mut refresh_lock = refresh_token.write().await;
-                                *refresh_lock = Some(response.refresh_token);
-
-                                let mut refresh_expiration_lock = refresh_expiration_time.write().await;
-                                *refresh_expiration_lock = Some(response.expires_at);
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to refresh token: {:?}", e);
-                                break;
-                            }
-                        }
+                        let mut refresh_expiration_lock = refresh_expiration_time.write().await;
+                        *refresh_expiration_lock = Some(response.expires_at);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to refresh token: {:?}", e);
+                        break;
                     }
                 }
             }
