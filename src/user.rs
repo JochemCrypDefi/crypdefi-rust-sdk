@@ -139,7 +139,7 @@ impl Bot {
                 .store(auto_refresh_value, Ordering::Relaxed);
         }
 
-        let response = login(&self.rest_client, login_req, self.base_url.clone()).await?;
+        let response = login(&self.rest_client, login_req, &self.base_url).await?;
 
         let challenge_bytes = hex::decode(response.challenge.clone())?;
 
@@ -157,7 +157,7 @@ impl Bot {
             hash_algorithm: http::HashAlgo::Sha256,
         };
 
-        let cra_response = cra_login(&self.rest_client, login_req, self.base_url.clone()).await?;
+        let cra_response = cra_login(&self.rest_client, login_req, &self.base_url).await?;
 
         // Store tokens
         let mut access_lock = self.access_token.write().await;
@@ -202,7 +202,7 @@ impl Bot {
             &self.rest_client,
             &refresh_lock,
             &access_lock,
-            self.base_url.clone(),
+            &self.base_url,
         )
         .await?;
 
@@ -245,7 +245,7 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub async fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
         let access_lock = self.access_token.read().await;
-        let wallets = get_wallets(&self.rest_client, &*access_lock, self.base_url.clone()).await?;
+        let wallets = get_wallets(&self.rest_client, &*access_lock, &self.base_url).await?;
 
         let mut wallets_lock = self.wallets.write().await;
         *wallets_lock = wallets.clone();
@@ -284,7 +284,7 @@ impl Bot {
             wallet_id,
             tx_type,
             hex_value,
-            self.base_url.clone(),
+            &self.base_url,
         )
         .await?;
 
@@ -310,7 +310,7 @@ impl Bot {
     pub async fn logout(&self) -> Result<(), BotSdkError> {
         self.cancel_refresh_task().await;
         let access_lock = self.access_token.read().await;
-        let res = logout(&self.rest_client, &*access_lock, self.base_url.clone()).await?;
+        let res = logout(&self.rest_client, &*access_lock, &self.base_url).await?;
         drop(access_lock);
         let mut access_lock = self.access_token.write().await;
         *access_lock = None;
@@ -348,7 +348,7 @@ impl Bot {
                         let refresh_lock = refresh_token.read().await;
                         let expiration_time_lock = refresh_expiration_time.read().await;
 
-                        match refresh_auth(&rest_client_clone, &refresh_lock, &access_lock, base_url_copy.clone()).await {
+                        match refresh_auth(&rest_client_clone, &refresh_lock, &access_lock, &base_url_copy).await {
                             Ok(response) => {
                                 drop(access_lock);
                                 drop(refresh_lock);

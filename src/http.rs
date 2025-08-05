@@ -2,7 +2,7 @@ use crate::error::BotSdkError;
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_URL: &str = "https://api.release.crypdefi.eu";
-fn set_url(base_url: String, endpoint: String) -> String {
+fn set_url(base_url: &str, endpoint: &str) -> String {
     let joinded_url: String = format!("{}{}", base_url, endpoint);
 
     return joinded_url;
@@ -30,9 +30,9 @@ pub struct LoginResponse {
 pub async fn login(
     client: &reqwest::Client,
     req: LoginRequest,
-    base_url: String,
+    base_url: &str,
 ) -> Result<LoginResponse, BotSdkError> {
-    let url = set_url(base_url, "/auth/login".to_string());
+    let url = set_url(base_url, "/auth/login");
     let response = client.post(url).json(&req).send().await?;
 
     if response.status().is_success() {
@@ -78,9 +78,9 @@ pub struct CraResponse {
 pub async fn cra_login(
     client: &reqwest::Client,
     req: CraRequest,
-    base_url: String,
+    base_url: &str,
 ) -> Result<CraResponse, BotSdkError> {
-    let url = set_url(base_url, "/auth/cra".to_string());
+    let url = set_url(base_url, "/auth/cra");
     let response = client.post(url).json(&req).send().await?;
 
     if response.status().is_success() {
@@ -128,6 +128,7 @@ pub struct Wallet {
     pub created_at: String,
     /** The status of the wallet */
     pub state: WalletState,
+
     pub address: String,
     pub chain: ChainSimple,
 }
@@ -136,14 +137,14 @@ pub struct Wallet {
 pub async fn get_wallets(
     client: &reqwest::Client,
     access_token_arc: &Option<String>,
-    base_url: String,
+    base_url: &str,
 ) -> Result<Vec<Wallet>, BotSdkError> {
     let access_token = match access_token_arc {
         Some(acc) => acc,
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = set_url(base_url, "/wallets?accessOnly=true".to_string());
+    let url = set_url(base_url, "/wallets?accessOnly=true");
 
     let response = client
         .get(url)
@@ -271,14 +272,14 @@ pub async fn sign(
     wallet_id: String,
     tx_type: SignatureRequestKind,
     hex: String,
-    base_url: String,
+    base_url: &str,
 ) -> Result<SigResponse, BotSdkError> {
     let access_token = match access_token_arc {
         Some(acc) => acc,
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = set_url(base_url, format!("/wallets/{}/sign", wallet_id));
+    let url = set_url(base_url, &format!("/wallets/{}/sign", wallet_id));
 
     let req = SignRequest {
         kind: tx_type,
@@ -314,14 +315,14 @@ pub async fn sign(
 pub async fn logout(
     client: &reqwest::Client,
     access_token_arc: &Option<String>,
-    base_url: String,
+    base_url: &str,
 ) -> Result<(), BotSdkError> {
     let access_token = match access_token_arc {
         Some(acc) => acc,
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = set_url(base_url, "/auth/logout".to_string());
+    let url = set_url(base_url, "/auth/logout");
 
     let response = client
         .post(url)
@@ -353,7 +354,7 @@ pub async fn refresh_auth(
     client: &reqwest::Client,
     refresh_token_opt: &Option<String>,
     access_token_opt: &Option<String>,
-    base_url: String,
+    base_url: &str,
 ) -> Result<CraResponse, BotSdkError> {
     let access_token = match access_token_opt {
         Some(acc) => acc,
@@ -364,7 +365,7 @@ pub async fn refresh_auth(
         None => return Err(BotSdkError::NoRefreshToken),
     };
 
-    let url = set_url(base_url, "/auth/refresh".to_string());
+    let url = set_url(base_url, "/auth/refresh");
 
     let req_body: RefreshRequest = RefreshRequest {
         refresh_token: refresh_token.clone(),
