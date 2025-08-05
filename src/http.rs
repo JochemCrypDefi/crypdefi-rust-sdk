@@ -101,7 +101,7 @@ pub async fn cra_login(
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
-enum WalletState {
+pub enum WalletState {
     #[serde(rename = "active")]
     Active,
     #[serde(rename = "inactive")]
@@ -112,24 +112,24 @@ enum WalletState {
 #[derive(Deserialize, Clone, Debug)]
 pub struct ChainSimple {
     /** The ID of the chain */
-    chain_id: String,
+    pub chain_id: String,
     /** The common name of the chain */
-    name: String,
+    pub name: String,
 }
 
 #[allow(dead_code)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Wallet {
     /** The id of the wallet */
-    wallet_id: String,
+    pub wallet_id: String,
     /** The friendly name of the wallet */
-    name: String,
+    pub name: String,
     /** The date when this wallet was created */
-    created_at: String,
+    pub created_at: String,
     /** The status of the wallet */
-    state: WalletState,
-    address: String,
-    chain: ChainSimple,
+    pub state: WalletState,
+    pub address: String,
+    pub chain: ChainSimple,
 }
 
 /// makes call to get wallets from backend for user.
@@ -180,9 +180,9 @@ pub struct SignRequest {
 #[allow(dead_code)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Signature {
-    r: String,
-    s: String,
-    recovery_id: Option<u64>,
+    pub r: String,
+    pub s: String,
+    pub recovery_id: Option<u64>,
 }
 
 fn encode_integer(bytes: &[u8]) -> Vec<u8> {
@@ -242,16 +242,16 @@ pub enum KeyAlgorithm {
 #[allow(dead_code)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct PublicKey {
-    algorithm: KeyAlgorithm,
-    public_key: String,
+    pub algorithm: KeyAlgorithm,
+    pub public_key: String,
 }
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct SigResponse {
-    payload: SignRequest,
-    key: PublicKey,
-    signature: Signature,
+    pub payload: SignRequest,
+    pub key: PublicKey,
+    pub signature: Signature,
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
