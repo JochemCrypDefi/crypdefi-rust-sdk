@@ -36,8 +36,7 @@ pub async fn login(
     let response = client.post(url).json(&req).send().await?;
 
     if response.status().is_success() {
-        let text = response.text().await?;
-        let res = serde_json::from_str::<LoginResponse>(&text)?;
+        let res = response.json::<LoginResponse>().await?;
         return Ok(res);
     }
 
@@ -84,8 +83,7 @@ pub async fn cra_login(
     let response = client.post(url).json(&req).send().await?;
 
     if response.status().is_success() {
-        let text = response.text().await?;
-        let res = serde_json::from_str::<CraResponse>(&text)?;
+        let res = response.json::<CraResponse>().await?;
         return Ok(res);
     }
 
@@ -153,8 +151,7 @@ pub async fn get_wallets(
         .await?;
 
     if response.status().is_success() {
-        let text = response.text().await?;
-        let res = serde_json::from_str::<Vec<Wallet>>(&text)?;
+        let res = response.json::<Vec<Wallet>>().await?;
         return Ok(res);
     }
 
@@ -295,8 +292,7 @@ pub async fn sign(
         .await?;
 
     if response.status().is_success() {
-        let text = response.text().await?;
-        let res = serde_json::from_str::<SigResponse>(&text)?;
+        let res = response.json::<SigResponse>().await?;
         return Ok(res);
     }
 
@@ -378,8 +374,7 @@ pub async fn refresh_auth(
         .send()
         .await?;
     if response.status().is_success() {
-        let text = response.text().await?;
-        let res = serde_json::from_str::<CraResponse>(&text)?;
+        let res = response.json::<CraResponse>().await?;
         return Ok(res);
     }
 
