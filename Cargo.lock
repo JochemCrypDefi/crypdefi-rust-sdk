@@ -140,6 +140,7 @@ name = "crypdefi-bot-sdk"
 version = "0.1.7"
 dependencies = [
  "hex",
+ "log",
  "p256",
  "pem",
  "pkcs8",

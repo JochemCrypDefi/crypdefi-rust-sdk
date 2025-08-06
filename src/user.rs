@@ -362,7 +362,7 @@ impl Bot {
                         *refresh_expiration_lock = Some(response.expires_at);
                     }
                     Err(e) => {
-                        eprintln!("Failed to refresh token: {e:?}");
+                        log::error!("Failed to refresh token: {e:?}");
                         break;
                     }
                 }
