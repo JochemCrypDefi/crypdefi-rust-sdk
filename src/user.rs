@@ -85,7 +85,7 @@ impl Bot {
             refresh_handle: Arc::new(RwLock::new(None)),
             refresh_expiration_time: Arc::new(RwLock::new(None)),
             base_url: final_base_url,
-            rest_client: rest_client,
+            rest_client,
         }))
     }
 
@@ -224,7 +224,7 @@ impl Bot {
             self.start_refresh_task(response.seconds - 10).await?;
         }
 
-        return Ok(());
+        Ok(())
     }
 
     /// Fetches all wallets associated with the authenticated bot user.
@@ -245,12 +245,12 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub async fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
         let access_lock = self.access_token.read().await;
-        let wallets = get_wallets(&self.rest_client, &*access_lock, &self.base_url).await?;
+        let wallets = get_wallets(&self.rest_client, &access_lock, &self.base_url).await?;
 
         let mut wallets_lock = self.wallets.write().await;
         *wallets_lock = wallets.clone();
 
-        return Ok(wallets);
+        Ok(wallets)
     }
 
     /// Signs a transaction (hex-encoded) using the specified wallet and signature request kind. The bot must have access to the wallet in the CrypDefi management UI.
@@ -288,7 +288,7 @@ impl Bot {
         )
         .await?;
 
-        return Ok(signature);
+        Ok(signature)
     }
 
     /// Logs out the bot and invalidates its current session token.
@@ -310,7 +310,7 @@ impl Bot {
     pub async fn logout(&self) -> Result<(), BotSdkError> {
         self.cancel_refresh_task().await;
         let access_lock = self.access_token.read().await;
-        let res = logout(&self.rest_client, &*access_lock, &self.base_url).await?;
+        logout(&self.rest_client, &access_lock, &self.base_url).await?;
         drop(access_lock);
         let mut access_lock = self.access_token.write().await;
         *access_lock = None;
@@ -320,7 +320,7 @@ impl Bot {
         let mut expiration = self.refresh_expiration_time.write().await;
         *expiration = None;
 
-        return Ok(res);
+        Ok(())
     }
 
     /// This watches for refresh
@@ -363,7 +363,7 @@ impl Bot {
                         *refresh_expiration_lock = Some(response.expires_at);
                     }
                     Err(e) => {
-                        eprintln!("Failed to refresh token: {:?}", e);
+                        eprintln!("Failed to refresh token: {e:?}");
                         break;
                     }
                 }
@@ -400,6 +400,6 @@ impl Bot {
     /// ```
     pub async fn auth_expiration_unix_time(&self) -> Result<Option<u64>, BotSdkError> {
         let expiration = self.refresh_expiration_time.read().await;
-        return Ok(*expiration);
+        Ok(*expiration)
     }
 }

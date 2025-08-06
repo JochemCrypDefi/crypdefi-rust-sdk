@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_URL: &str = "https://api.release.crypdefi.eu";
 fn set_url(base_url: &str, endpoint: &str) -> String {
-    let joinded_url: String = format!("{}{}", base_url, endpoint);
+    let joinded_url: String = format!("{base_url}{endpoint}");
 
-    return joinded_url;
+    joinded_url
 }
 
 #[derive(Serialize)]
@@ -43,12 +43,12 @@ pub async fn login(
     let status = response.status();
     let res = response.text().await?;
 
-    return Err(BotSdkError::Custom(format!(
+    Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not make login request".to_string(),
+        "Could not make login request",
         status,
         res
-    )));
+    )))
 }
 
 #[derive(Serialize)]
@@ -90,12 +90,12 @@ pub async fn cra_login(
     let status = response.status();
     let res = response.text().await?;
 
-    return Err(BotSdkError::Custom(format!(
+    Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not make CRA login".to_string(),
+        "Could not make CRA login",
         status,
         res
-    )));
+    )))
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -158,12 +158,12 @@ pub async fn get_wallets(
     let status = response.status();
     let res = response.text().await?;
 
-    return Err(BotSdkError::Custom(format!(
+    Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not get wallets".to_string(),
+        "Could not get wallets",
         status,
         res
-    )));
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -276,7 +276,7 @@ pub async fn sign(
         None => return Err(BotSdkError::NoAccessToken),
     };
 
-    let url = set_url(base_url, &format!("/wallets/{}/sign", wallet_id));
+    let url = set_url(base_url, &format!("/wallets/{wallet_id}/sign"));
 
     let req = SignRequest {
         kind: tx_type,
@@ -299,12 +299,12 @@ pub async fn sign(
     let status = response.status();
     let res = response.text().await?;
 
-    return Err(BotSdkError::Custom(format!(
+    Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not get signature".to_string(),
+        "Could not get signature",
         status,
         res
-    )));
+    )))
 }
 
 /// Request signature from keyvault passing hex transactions
@@ -332,12 +332,12 @@ pub async fn logout(
     let status = response.status();
     let res = response.text().await?;
 
-    return Err(BotSdkError::Custom(format!(
+    Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not logout".to_string(),
+        "Could not logout",
         status,
         res
-    )));
+    )))
 }
 
 #[derive(Serialize, Debug)]
@@ -381,10 +381,10 @@ pub async fn refresh_auth(
     let status = response.status();
     let res = response.text().await?;
 
-    return Err(BotSdkError::Custom(format!(
+    Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not refresh auth".to_string(),
+        "Could not refresh auth",
         status,
         res
-    )));
+    )))
 }
