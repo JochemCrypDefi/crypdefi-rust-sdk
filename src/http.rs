@@ -45,9 +45,7 @@ pub async fn login(
 
     Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not make login request",
-        status,
-        res
+        "Could not make login request", status, res
     )))
 }
 
@@ -92,9 +90,7 @@ pub async fn cra_login(
 
     Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not make CRA login",
-        status,
-        res
+        "Could not make CRA login", status, res
     )))
 }
 
@@ -160,9 +156,7 @@ pub async fn get_wallets(
 
     Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not get wallets",
-        status,
-        res
+        "Could not get wallets", status, res
     )))
 }
 
@@ -301,9 +295,7 @@ pub async fn sign(
 
     Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not get signature",
-        status,
-        res
+        "Could not get signature", status, res
     )))
 }
 
@@ -334,9 +326,7 @@ pub async fn logout(
 
     Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not logout",
-        status,
-        res
+        "Could not logout", status, res
     )))
 }
 
@@ -383,8 +373,6 @@ pub async fn refresh_auth(
 
     Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",
-        "Could not refresh auth",
-        status,
-        res
+        "Could not refresh auth", status, res
     )))
 }

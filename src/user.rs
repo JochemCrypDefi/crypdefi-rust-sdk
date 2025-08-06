@@ -278,7 +278,8 @@ impl Bot {
         hex_value: String,
     ) -> Result<SigResponse, BotSdkError> {
         let access_lock = self.access_token.read().await;
-        let signature = sign(
+
+        sign(
             &self.rest_client,
             &access_lock,
             wallet_id,
@@ -286,9 +287,7 @@ impl Bot {
             hex_value,
             &self.base_url,
         )
-        .await?;
-
-        Ok(signature)
+        .await
     }
 
     /// Logs out the bot and invalidates its current session token.
@@ -398,8 +397,8 @@ impl Bot {
     ///
     /// bot.auth_expiration_unix_time().await;
     /// ```
-    pub async fn auth_expiration_unix_time(&self) -> Result<Option<u64>, BotSdkError> {
+    pub async fn auth_expiration_unix_time(&self) -> Option<u64> {
         let expiration = self.refresh_expiration_time.read().await;
-        Ok(*expiration)
+        *expiration
     }
 }
