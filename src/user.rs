@@ -44,6 +44,7 @@ async fn auto_refresh_task(
             Ok(response) => {
                 drop(access_lock);
                 drop(refresh_lock);
+                println!("MANAGED TO Refresh");
 
                 let mut access_lock = access_token_rw.write().await;
                 *access_lock = Some(response.token);
@@ -199,19 +200,13 @@ impl Bot {
 
         self.cancel_refresh_task().await;
         let refresh_handle = if auto_refresh {
-            let rest_client_clone = self.rest_client.clone();
-            let access_token_clone = self.access_token.clone();
-            let refresh_url_clone = self.refresh_token.clone();
-            let refresh_expiration_time_clone = self.refresh_expiration_time.clone();
-            let base_url_clone = self.base_url.clone();
-
             // Start the refresh task
             let handle = tokio::spawn(auto_refresh_task(
-                rest_client_clone,
-                base_url_clone,
-                access_token_clone,
-                refresh_url_clone,
-                refresh_expiration_time_clone,
+                self.rest_client.clone(),
+                self.base_url.clone(),
+                self.access_token.clone(),
+                self.refresh_token.clone(),
+                self.refresh_expiration_time.clone(),
                 cra_response.seconds.clone() - 10,
             ));
 
@@ -266,22 +261,14 @@ impl Bot {
         drop(refresh_time_lock);
 
         let refresh_handle = if auto_refresh {
-            let rest_client_clone = self.rest_client.clone();
-            let access_token_clone = self.access_token.clone();
-            let refresh_url_clone = self.refresh_token.clone();
-            let refresh_expiration_time_clone = self.refresh_expiration_time.clone();
-            let base_url_clone = self.base_url.clone();
-
-            // Start the refresh task
             let handle = tokio::spawn(auto_refresh_task(
-                rest_client_clone,
-                base_url_clone,
-                access_token_clone,
-                refresh_url_clone,
-                refresh_expiration_time_clone,
+                self.rest_client.clone(),
+                self.base_url.clone(),
+                self.access_token.clone(),
+                self.refresh_token.clone(),
+                self.refresh_expiration_time.clone(),
                 response.seconds.clone() - 10,
             ));
-
             Some(handle)
         } else {
             None
