@@ -19,7 +19,8 @@ fn sign_challenge_with_ecdsa(
     // Sign the challenge
     let signature: DerSignature = signing_key.sign(&challenge);
     let verifying_key = VerifyingKey::from(&signing_key);
-    assert!(verifying_key.verify(&challenge, &signature).is_ok());
+
+    verifying_key.verify(&challenge, &signature)?;
 
     // Convert the signature to bytes
     Ok(signature)
@@ -39,14 +40,7 @@ async fn auto_refresh_task(
 
         let refresh_lock = refresh_token_rw.read().await;
 
-        match refresh_auth(
-            &client,
-            refresh_lock.clone(),
-            access_lock.clone(),
-            &base_url,
-        )
-        .await
-        {
+        match refresh_auth(&client, &refresh_lock, &access_lock, &base_url).await {
             Ok(response) => {
                 drop(access_lock);
                 drop(refresh_lock);
@@ -77,8 +71,7 @@ pub struct Bot {
     refresh_token: Arc<RwLock<Option<String>>>,
     user_id: String,
 
-    // auto_refresh_enabled: AtomicBool,
-    refresh_handle: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
+    refresh_handle: Option<tokio::task::JoinHandle<()>>,
     /// unix timestamp on when the token expires
     refresh_expiration_time: Arc<RwLock<Option<u64>>>,
     base_url: String,
@@ -127,7 +120,7 @@ impl Bot {
             user_id: user_id,
 
             // auto_refresh_enabled: AtomicBool::new(false),
-            refresh_handle: Arc::new(RwLock::new(None)),
+            refresh_handle: None,
             refresh_expiration_time: Arc::new(RwLock::new(None)),
             base_url: final_base_url,
             rest_client,
@@ -151,7 +144,7 @@ impl Bot {
     /// ```
     ///
     /// # Note: uses tokio async runtime
-    pub async fn login(&self, auto_refresh: bool) -> Result<(), BotSdkError> {
+    pub async fn login(&mut self, auto_refresh: bool) -> Result<(), BotSdkError> {
         let mut user_iter = self.user_id.split("-");
 
         if user_iter.next() != Some("us") {
@@ -171,9 +164,6 @@ impl Bot {
             user_id: self.user_id.clone(),
             auth_method: "cra".to_string(),
         };
-
-        // Cancel any existing refresh task
-        self.cancel_refresh_task().await;
 
         let response = login(&self.rest_client, login_req, &self.base_url).await?;
 
@@ -230,9 +220,7 @@ impl Bot {
             None
         };
 
-        let mut refresh_handle_lock = self.refresh_handle.write().await;
-        *refresh_handle_lock = refresh_handle;
-        drop(refresh_handle_lock);
+        self.refresh_handle = refresh_handle;
 
         Ok(())
     }
@@ -252,13 +240,14 @@ impl Bot {
     /// ```
     ///
     /// # Note: uses tokio async runtime
-    pub async fn refresh(&self, auto_refresh: bool) -> Result<(), BotSdkError> {
+    pub async fn refresh(&mut self, auto_refresh: bool) -> Result<(), BotSdkError> {
+        self.cancel_refresh_task().await;
         let access_lock = self.access_token.read().await;
         let refresh_lock = self.refresh_token.read().await;
         let response = refresh_auth(
             &self.rest_client,
-            refresh_lock.clone(),
-            access_lock.clone(),
+            &refresh_lock,
+            &access_lock,
             &self.base_url,
         )
         .await?;
@@ -276,7 +265,6 @@ impl Bot {
         *refresh_time_lock = Some(response.expires_at);
         drop(refresh_time_lock);
 
-        self.cancel_refresh_task().await;
         let refresh_handle = if auto_refresh {
             let rest_client_clone = self.rest_client.clone();
             let access_token_clone = self.access_token.clone();
@@ -299,10 +287,7 @@ impl Bot {
             None
         };
 
-        let mut refresh_handle_lock = self.refresh_handle.write().await;
-        *refresh_handle_lock = refresh_handle;
-        drop(refresh_handle_lock);
-
+        self.refresh_handle = refresh_handle;
         Ok(())
     }
 
@@ -399,13 +384,11 @@ impl Bot {
         Ok(())
     }
 
-    async fn cancel_refresh_task(&self) {
-        let mut handle = self.refresh_handle.write().await;
-
-        if let Some(thread_handle) = handle.take() {
+    async fn cancel_refresh_task(&mut self) {
+        if let Some(thread_handle) = self.refresh_handle.take() {
             thread_handle.abort();
             let _ = thread_handle.await;
-            *handle = None
+            self.refresh_handle = None
         }
     }
 

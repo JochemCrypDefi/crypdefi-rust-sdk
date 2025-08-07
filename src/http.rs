@@ -336,8 +336,8 @@ struct RefreshRequest {
 /// Make call to try to refresh the access token
 pub async fn refresh_auth(
     client: &reqwest::Client,
-    refresh_token_opt: Option<String>,
-    access_token_opt: Option<String>,
+    refresh_token_opt: &Option<String>,
+    access_token_opt: &Option<String>,
     base_url: &str,
 ) -> Result<CraResponse, BotSdkError> {
     let access_token = match access_token_opt {
