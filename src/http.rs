@@ -1,4 +1,5 @@
 use crate::error::BotSdkError;
+use parking_lot::{ArcRwLockReadGuard, RawRwLock, RwLockReadGuard};
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_URL: &str = "https://api.release.crypdefi.eu";
@@ -336,15 +337,15 @@ struct RefreshRequest {
 /// Make call to try to refresh the access token
 pub async fn refresh_auth(
     client: &reqwest::Client,
-    refresh_token_opt: &Option<String>,
-    access_token_opt: &Option<String>,
+    refresh_token_opt: Option<String>,
+    access_token_opt: Option<String>,
     base_url: &str,
 ) -> Result<CraResponse, BotSdkError> {
     let access_token = match access_token_opt {
         Some(acc) => acc,
         None => return Err(BotSdkError::NoAccessToken),
     };
-    let refresh_token = match refresh_token_opt {
+    let refresh_token = match refresh_token_opt.clone().to_owned() {
         Some(acc) => acc,
         None => return Err(BotSdkError::NoRefreshToken),
     };
@@ -375,7 +376,6 @@ pub async fn refresh_auth(
     )))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -392,7 +392,7 @@ mod tests {
         let der_hex = hex::encode(&der_result);
 
         let expected_der_hex = "3045022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c902204a28dc564d87e36871d032a208ccef1229a8c95875928f867d77daa21991ca2e";
-        
+
         assert_eq!(der_hex, expected_der_hex);
     }
     #[test]
@@ -407,32 +407,39 @@ mod tests {
         let der_hex = hex::encode(&der_result);
 
         let expected_der_hex = "3045022100d12c949a67ebdaf38350fda2b6d4e0e2bb8a8c8160cfbc6487a3719e2187dd02022018f9b3eb182ef670832698f57dc663ddf0501e202aa90865d13abe12e2cd7559";
-        
+
         assert_eq!(der_hex, expected_der_hex);
     }
 
     #[test]
     fn test_encode_integer_positive() {
         // Test with a positive number that doesn't need padding
-        let bytes = hex::decode("bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9").unwrap();
+        let bytes = hex::decode("bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
+            .unwrap();
         let mut buffer = Vec::new();
-        
+
         encode_integer(&bytes, &mut buffer);
-        
-        let expected = hex::decode("022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9").unwrap();
+
+        let expected =
+            hex::decode("022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
+                .unwrap();
         assert_eq!(buffer, expected);
     }
 
     #[test]
     fn test_encode_integer_remove_leading_zeros() {
         // Test removing leading zeros (but keeping at least one)
-        let bytes = hex::decode("0000bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9").unwrap();
+        let bytes =
+            hex::decode("0000bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
+                .unwrap();
         let mut buffer = Vec::new();
-        
+
         encode_integer(&bytes, &mut buffer);
-        
+
         // Should remove leading zeros
-        let expected = hex::decode("022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9").unwrap();
+        let expected =
+            hex::decode("022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
+                .unwrap();
         assert_eq!(buffer, expected);
     }
 
@@ -441,9 +448,9 @@ mod tests {
         // Test that single zero is preserved
         let bytes = vec![0x00];
         let mut buffer = Vec::new();
-        
+
         encode_integer(&bytes, &mut buffer);
-        
+
         let expected = vec![0x02, 0x01, 0x00]; // INTEGER tag, length 1, value 0
         assert_eq!(buffer, expected);
     }

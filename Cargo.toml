@@ -21,6 +21,7 @@ sha2 = "0.10.8"
 hex = "0.4.3"
 serde_json = "1.0.140"
 log = "0.4.27"
+parking_lot = { version = "0.12.4", features = ["arc_lock"] }
 
 [lib]
 name = "crypdefi_bot_sdk"
