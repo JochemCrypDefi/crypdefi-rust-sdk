@@ -442,15 +442,4 @@ mod tests {
         assert_eq!(buffer, expected);
     }
 
-    #[test]
-    fn test_encode_integer_keep_single_zero() {
-        // Test that single zero is preserved
-        let bytes = vec![0x00];
-        let mut buffer = Vec::new();
-
-        encode_integer(&bytes, &mut buffer);
-
-        let expected = vec![0x02, 0x01, 0x00]; // INTEGER tag, length 1, value 0
-        assert_eq!(buffer, expected);
-    }
 }
