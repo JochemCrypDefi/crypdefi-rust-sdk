@@ -203,10 +203,7 @@ impl Signature {
         let r_bytes = hex::decode(&self.r)?;
         let s_bytes = hex::decode(&self.s)?;
 
-        // Speculatively reserve 64 bytes. Unsure if this is the correct value, but
-        // Vec reserves values quasi-exponentially (0, 1, 2, 4, 8, 16..) to speculatively
-        // avoid frequent reallocations. Next higher value should be 128
-        let mut der = Vec::with_capacity(64);
+        let mut der = Vec::with_capacity(128);
 
         // Byte 0 is sequence tag 0x30, byte 1 is the length which we don't yet know, we'll edit later
         der.extend_from_slice(&[0x30, 0]);
