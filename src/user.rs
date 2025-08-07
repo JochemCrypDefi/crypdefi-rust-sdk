@@ -26,6 +26,42 @@ fn sign_challenge_with_ecdsa(
     Ok(signature)
 }
 
+#[derive(Debug, Clone)]
+pub struct UserId {
+    full_id: String,
+    organization: String,
+}
+
+impl UserId {
+    pub fn new(id: String) -> Result<Self, BotSdkError> {
+        let mut user_iter = id.split("-");
+
+        if user_iter.next() != Some("us") {
+            return Err(BotSdkError::IdNotUserId);
+        }
+
+        let Some(organization) = user_iter.next() else {
+            return Err(BotSdkError::InvalidUserId);
+        };
+
+        if user_iter.next().is_none() {
+            return Err(BotSdkError::InvalidUserId);
+        }
+
+        return Ok(Self {
+            full_id: id.clone(),
+            organization: organization.to_string(),
+        });
+    }
+
+    pub fn get_organization(&self) -> String {
+        return self.organization.clone();
+    }
+    pub fn get_full_id(&self) -> String {
+        return self.full_id.clone();
+    }
+}
+
 async fn auto_refresh_task(
     client: reqwest::Client,
     base_url: String,
@@ -70,7 +106,7 @@ pub struct Bot {
     private_cert: SigningKey,
     access_token: Arc<RwLock<Option<String>>>,
     refresh_token: Arc<RwLock<Option<String>>>,
-    user_id: String,
+    user_id: UserId,
 
     refresh_handle: Option<tokio::task::JoinHandle<()>>,
     /// unix timestamp on when the token expires
@@ -90,13 +126,15 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    ///let bot = Bot::new(priv_key, None).await.unwrap();
+    ///
+    ///let user_id = UserId::new(String::from("us-0000000000-1d09b044f88074ab7cfd"))?;
+    ///let bot = Bot::new(priv_key, user_id, None).await.unwrap();
     ///
     /// NOTE: unless changed endpoint will default to: https://api.release.crypdefi.eu.  
     /// ```
     pub async fn new(
         pem_key: String,
-        user_id: String,
+        user_id: UserId,
         base_url: Option<String>,
     ) -> Result<Self, BotSdkError> {
         let signing_key = SigningKey::from_pkcs8_pem(pem_key.as_str())?;
@@ -138,31 +176,18 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key, None).unwrap();
+    /// let user_id = UserId::new(String::from("us-0000000000-1d09b044f88074ab7cfd"))?;
+    /// let bot = Bot::new(priv_key, user_id, None).await.unwrap();
     ///
-    /// NOTE: By default the bot will auto_refresh login
-    /// bot.login(String::from("us-0000000000-fbf17c83704f04af11c6"), None).await.unwrap();
-    /// ```
+    /// // if auto refresh is set to true a thread will be spun up to do this action.
+    /// bot.login(false).await.unwrap();
+    ///
     ///
     /// # Note: uses tokio async runtime
     pub async fn login(&mut self, auto_refresh: bool) -> Result<(), BotSdkError> {
-        let mut user_iter = self.user_id.split("-");
-
-        if user_iter.next() != Some("us") {
-            return Err(BotSdkError::IdNotUserId);
-        }
-
-        let Some(organization) = user_iter.next() else {
-            return Err(BotSdkError::InvalidUserId);
-        };
-
-        if user_iter.next().is_none() {
-            return Err(BotSdkError::InvalidUserId);
-        }
-
         let login_req = LoginRequest {
-            organization: organization.to_string(),
-            user_id: self.user_id.clone(),
+            organization: self.user_id.get_organization(),
+            user_id: self.user_id.get_full_id(),
             auth_method: "cra".to_string(),
         };
 
@@ -177,7 +202,7 @@ impl Bot {
 
         let hex_signed_challenge = hex::encode(signed_bytes);
         let login_req = CraRequest {
-            user_id: self.user_id.clone(),
+            user_id: self.user_id.get_full_id(),
             challenge: response.challenge,
             response: hex_signed_challenge,
             hash_algorithm: http::HashAlgo::Sha256,
@@ -230,8 +255,12 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key, None).await.unwrap();
-    /// bot.refresh().unwrap
+    /// let user_id = UserId::new(String::from("us-0000000000-1d09b044f88074ab7cfd"))?;
+    /// let bot = Bot::new(priv_key, user_id, None).await.unwrap();
+    ///
+    /// // if auto refresh is set to true a thread will be spun up to do this action.
+    ///
+    /// bot.refresh(true).await.unwrap()
     /// ```
     ///
     /// # Note: uses tokio async runtime
@@ -288,7 +317,9 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key, None).unwrap();
+    /// let user_id = UserId::new(String::from("us-0000000000-1d09b044f88074ab7cfd"))?;
+    /// let bot = Bot::new(priv_key, user_id, None).await.unwrap();
+    ///
     /// let wallets = bot.get_wallets().await.unwrap();
     /// println!("wallets: {:?}", wallets);
     /// ```
@@ -311,7 +342,8 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key, None).unwrap();
+    /// let user_id = UserId::new(String::from("us-0000000000-1d09b044f88074ab7cfd"))?;
+    /// let bot = Bot::new(priv_key, user_id, None).await.unwrap();
     ///
     /// let wallet_id = "wa-0000000000-4f45f9d208e9207736fb".to_string();
     /// let transaction_hex = "02f8af01018390f560850461933067828cb394a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4880b844095ea7b300000000000000000000000097802f38a37e1d789eba194513e3eb7e918d34df000000000000000000000000000000000000000000000000000000001dcd6500c001a0ad0b4a87309ef94b96d38f145d676d971ca1f1e4702c9cace99fdec8df4a8814a008651a171f31629bcf3a686ca26b9d3cece44c6dfec39fb2c1848e3b290ba121".to_string();
@@ -348,7 +380,8 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key, None).unwrap();
+    /// let user_id = UserId::new(String::from("us-0000000000-1d09b044f88074ab7cfd"))?;
+    /// let bot = Bot::new(priv_key, user_id, None).await.unwrap();
     ///
     /// bot.logout().await.unwrap();
     /// ```
@@ -389,7 +422,8 @@ impl Bot {
     /// +zR4VVTid8eKVEneOef9lSiFyQczQh6MPwpKGtjAexp3sxJryohTQylr
     /// -----END PRIVATE KEY-----",
     ///
-    /// let bot = Bot::new(priv_key, None).unwrap();
+    /// let user_id = UserId::new(String::from("us-0000000000-1d09b044f88074ab7cfd"))?;
+    /// let bot = Bot::new(priv_key, user_id, None).await.unwrap();
     ///
     /// bot.auth_expiration_unix_time().await;
     /// ```

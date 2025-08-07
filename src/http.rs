@@ -441,5 +441,4 @@ mod tests {
                 .unwrap();
         assert_eq!(buffer, expected);
     }
-
 }
