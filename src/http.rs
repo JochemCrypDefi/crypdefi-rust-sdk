@@ -177,9 +177,8 @@ pub struct Signature {
     pub recovery_id: Option<u64>,
 }
 
-fn encode_integer(bytes: &[u8]) -> Vec<u8> {
-    let mut result = Vec::new();
-    result.push(0x02); // Integer tag
+fn encode_integer(bytes: &[u8], buff: &mut Vec<u8>) {
+    buff.push(0x02); // Integer tag
 
     // Remove leading zeros, but ensure at least one byte remains
     let mut trimmed = bytes;
@@ -189,35 +188,34 @@ fn encode_integer(bytes: &[u8]) -> Vec<u8> {
 
     // If the first bit is 1, prepend a 0x00 to avoid interpreting as negative
     if trimmed[0] & 0x80 != 0 {
-        result.push((trimmed.len() + 1) as u8); // Length includes the extra 0x00
-        result.push(0x00);
+        buff.push((trimmed.len() + 1) as u8); // Length includes the extra 0x00
+        buff.push(0x00);
     } else {
-        result.push(trimmed.len() as u8); // Length of the integer
+        buff.push(trimmed.len() as u8); // Length of the integer
     }
 
-    result.extend_from_slice(trimmed);
-    result
+    buff.extend_from_slice(trimmed);
 }
+
 impl Signature {
     pub fn to_der(&self) -> Result<Vec<u8>, BotSdkError> {
         // Convert hex strings to byte vectors
         let r_bytes = hex::decode(&self.r)?;
-
         let s_bytes = hex::decode(&self.s)?;
 
-        // Ensure r and s are properly padded or trimmed for DER encoding
-        let r_der = encode_integer(&r_bytes);
-        let s_der = encode_integer(&s_bytes);
-
-        // Construct the sequence: 0x30 (sequence tag) + length + r_der + s_der
-        let total_length = r_der.len() + s_der.len();
+        // Speculatively reserve 64 bytes. Unsure if this is the correct value, but
+        // Vec reserves values quasi-exponentially (0, 1, 2, 4, 8, 16..) to speculatively
+        // avoid frequent reallocations. Next higher value should be 128
         let mut der = Vec::with_capacity(total_length + 2);
 
-        der.push(0x30); // Sequence tag
-        der.push(total_length as u8); // Length of the sequence
+        // Byte 0 is sequence tag 0x30, byte 1 is the length which we don't yet know, we'll edit later
+        der.extend_from_slice(&[0x30, 0]);
 
-        der.extend_from_slice(&r_der);
-        der.extend_from_slice(&s_der);
+        // Append encoded integer
+        encode_integer(&r_bytes, &mut der);
+        encode_integer(&s_bytes, &mut der);
+
+        der[1] = der.len() as u8 - 2;
 
         Ok(der)
     }
@@ -375,4 +373,78 @@ pub async fn refresh_auth(
         "{}.\n Status: {} \n Body: {}",
         "Could not refresh auth", status, res
     )))
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_signature_to_der() {
+        let signature = Signature {
+            r: "bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9".to_string(),
+            s: "4a28dc564d87e36871d032a208ccef1229a8c95875928f867d77daa21991ca2e".to_string(),
+            recovery_id: Some(0),
+        };
+
+        let der_result = signature.to_der().unwrap();
+        let der_hex = hex::encode(&der_result);
+
+        let expected_der_hex = "3045022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c902204a28dc564d87e36871d032a208ccef1229a8c95875928f867d77daa21991ca2e";
+        
+        assert_eq!(der_hex, expected_der_hex);
+    }
+    #[test]
+    fn test_signature_to_der_2() {
+        let signature = Signature {
+            r: "d12c949a67ebdaf38350fda2b6d4e0e2bb8a8c8160cfbc6487a3719e2187dd02".to_string(),
+            s: "18f9b3eb182ef670832698f57dc663ddf0501e202aa90865d13abe12e2cd7559".to_string(),
+            recovery_id: Some(1),
+        };
+
+        let der_result = signature.to_der().unwrap();
+        let der_hex = hex::encode(&der_result);
+
+        let expected_der_hex = "3045022100d12c949a67ebdaf38350fda2b6d4e0e2bb8a8c8160cfbc6487a3719e2187dd02022018f9b3eb182ef670832698f57dc663ddf0501e202aa90865d13abe12e2cd7559";
+        
+        assert_eq!(der_hex, expected_der_hex);
+    }
+
+    #[test]
+    fn test_encode_integer_positive() {
+        // Test with a positive number that doesn't need padding
+        let bytes = hex::decode("bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9").unwrap();
+        let mut buffer = Vec::new();
+        
+        encode_integer(&bytes, &mut buffer);
+        
+        let expected = hex::decode("022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9").unwrap();
+        assert_eq!(buffer, expected);
+    }
+
+    #[test]
+    fn test_encode_integer_remove_leading_zeros() {
+        // Test removing leading zeros (but keeping at least one)
+        let bytes = hex::decode("0000bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9").unwrap();
+        let mut buffer = Vec::new();
+        
+        encode_integer(&bytes, &mut buffer);
+        
+        // Should remove leading zeros
+        let expected = hex::decode("022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9").unwrap();
+        assert_eq!(buffer, expected);
+    }
+
+    #[test]
+    fn test_encode_integer_keep_single_zero() {
+        // Test that single zero is preserved
+        let bytes = vec![0x00];
+        let mut buffer = Vec::new();
+        
+        encode_integer(&bytes, &mut buffer);
+        
+        let expected = vec![0x02, 0x01, 0x00]; // INTEGER tag, length 1, value 0
+        assert_eq!(buffer, expected);
+    }
 }
