@@ -1,8 +1,14 @@
-use crypdefi_bot_sdk::{error::BotSdkError, http::SignatureRequestKind, user::Bot};
+use crypdefi_bot_sdk::{
+    error::BotSdkError,
+    http::SignatureRequestKind,
+    user::{Bot, UserId},
+};
 use tokio::time::{Duration, sleep};
 
 #[tokio::main]
 async fn main() -> Result<(), BotSdkError> {
+    let user_id = UserId::new(String::from("us-0000000000-1d09b044f88074ab7cfd"))?;
+
     let mut bot = Bot::new(
         String::from(
             "-----BEGIN PRIVATE KEY-----
@@ -11,13 +17,13 @@ E+jpJnxOH/5nIg6Nk8HJtL7dlNOhRANCAARLFq3OvO/McpHQud7nLUAgo+wv64kL
 nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
 -----END PRIVATE KEY-----",
         ),
-        String::from("us-0000000000-1d09b044f88074ab7cfd"),
+        user_id,
         Some(String::from("https://api.sandbox.crypdefi.eu")),
     )
     .await?;
 
     println!("Bot: {:?}", bot);
-    bot.login(false).await?;
+    bot.login(true).await?;
 
     println!("loginging");
     let wallets = bot.get_wallets().await?;
@@ -36,9 +42,9 @@ nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
             hex::encode(signature.signature.to_der()?)
         );
 
-        println!("refreshing");
-        let result = bot.refresh().await?;
-        println!("refresh result: {:?}", result);
+        // println!("refreshing");
+        // let result = bot.refresh(true).await?;
+        // println!("refresh result: {:?}", result);
 
         let expiration = bot.auth_expiration_unix_time().await;
         println!("expiration: {:?}", expiration);
