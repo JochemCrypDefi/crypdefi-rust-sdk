@@ -20,6 +20,8 @@ pem = "3.0.5"
 sha2 = "0.10.8"
 hex = "0.4.3"
 serde_json = "1.0.140"
+log = "0.4.27"
+parking_lot = { version = "0.12.4", features = ["arc_lock"] }
 
 [lib]
 name = "crypdefi_bot_sdk"
@@ -29,3 +31,20 @@ path = "src/lib.rs"
 [[bin]]
 name = "crypdefi-bot"
 path = "src/bot.rs"
+
+
+[lints.rust]
+unreachable_pub = "warn"
+unused_must_use = "deny"
+rust_2018_idioms = { level = "deny", priority = -1 }
+
+[lints.clippy]
+cognitive_complexity = "warn"
+collection_is_never_read = "warn"
+fallible_impl_from = "warn"
+manual_clamp = "warn"
+missing_const_for_fn = "warn"
+mutex_integer = "warn"
+redundant_clone = "warn"
+unwrap_used = "deny"
+implicit_return = "allow"

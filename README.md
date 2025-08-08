@@ -43,20 +43,22 @@ use std::fs;
 
 // --------------------------- CONFIG ---------------------------
 // Replace with your bot's user_id.
-let user_id = "us-0000000000-94518ea57547afd340c3";
+let user_id_str = String::from("us-0000000000-94518ea57547afd340c3");
+// This check that the format of the user id is at least correct.
+let user_id = UserId::new(user_id_str)?;
+
 // Replace with the wallet_id of the wallet you want to trade with.
 let wallet_id = "wa-0000000000-9f3542a65690ff697b85"; 
 // This is the bot's private key used to authenticate with CrypDefi (not the wallet's private key).
 let private_key_pem = fs::read_to_string("private_key_pkcs8.pem").expect("Failed to read private_key_pkcs8.pem");
 
-let bot = Bot::new(String::from(private_key_pem), None).unwrap();
+let bot = Bot::new(String::from(private_key_pem),user_id, None).unwrap();
 println!("Bot: {:?}", bot);
 
 // --------------------------- LOGIN WITH BOT ---------------------------
 // if you turn off auto_refresh the bot will not automatically re-authenticate itself when its login-token is about to expire
 bot.login(
-    user_id.to_string(),
-    Some(false)
+    false
 ).await.unwrap();
 
 ```
