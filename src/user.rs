@@ -48,48 +48,46 @@ impl UserId {
             return Err(BotSdkError::InvalidUserId);
         }
 
-        return Ok(Self {
-            full_id: id.clone(),
+        Ok(Self {
             organization: organization.to_string(),
-        });
+            full_id: id,
+        })
     }
 
-    pub fn get_organization(&self) -> String {
-        return self.organization.clone();
+    pub fn organization(&self) -> &str {
+        return &self.organization;
     }
-    pub fn get_full_id(&self) -> String {
-        return self.full_id.clone();
+    pub fn full_id(&self) -> &str {
+        return &self.full_id;
     }
 }
 
 async fn auto_refresh_task(
     client: reqwest::Client,
     base_url: String,
-    access_token_rw: Arc<RwLock<Option<String>>>,
-    refresh_token_rw: Arc<RwLock<Option<String>>>,
-    refresh_expiration_time: Arc<RwLock<Option<u64>>>,
+    shared_values_rw: Arc<RwLock<SharedValues>>,
+
     seconds: u64,
 ) {
     loop {
         tokio::time::sleep(Duration::from_secs(seconds)).await;
-        let access_lock = access_token_rw.read().await;
 
-        let refresh_lock = refresh_token_rw.read().await;
+        let shared_values_lock = shared_values_rw.read().await;
 
-        match refresh_auth(&client, &refresh_lock, &access_lock, &base_url).await {
+        match refresh_auth(
+            &client,
+            &shared_values_lock.refresh_token,
+            &shared_values_lock.access_token,
+            &base_url,
+        )
+        .await
+        {
             Ok(response) => {
-                drop(access_lock);
-                drop(refresh_lock);
-                println!("MANAGED TO Refresh");
-
-                let mut access_lock = access_token_rw.write().await;
-                *access_lock = Some(response.token);
-
-                let mut refresh_lock = refresh_token_rw.write().await;
-                *refresh_lock = Some(response.refresh_token);
-
-                let mut refresh_expiration_lock = refresh_expiration_time.write().await;
-                *refresh_expiration_lock = Some(response.expires_at);
+                drop(shared_values_lock);
+                let mut shared_values_write_lock = shared_values_rw.write().await;
+                shared_values_write_lock.access_token = Some(response.token);
+                shared_values_write_lock.refresh_token = Some(response.refresh_token);
+                shared_values_write_lock.refresh_expiration_time = Some(response.expires_at);
             }
             Err(e) => {
                 log::error!("Failed to refresh token: {e:?}");
@@ -98,19 +96,23 @@ async fn auto_refresh_task(
     }
 }
 
+#[derive(Debug)]
+struct SharedValues {
+    access_token: Option<String>,
+    refresh_token: Option<String>,
+    refresh_expiration_time: Option<u64>,
+}
+
 /// Bot used signing requests for crypdefi wallets.
 ///
 /// # Note: Most of the implemented functions in the bot use the tokio runtime inside it.
 #[derive(Debug)]
 pub struct Bot {
     private_cert: SigningKey,
-    access_token: Arc<RwLock<Option<String>>>,
-    refresh_token: Arc<RwLock<Option<String>>>,
     user_id: UserId,
-
     refresh_handle: Option<tokio::task::JoinHandle<()>>,
-    /// unix timestamp on when the token expires
-    refresh_expiration_time: Arc<RwLock<Option<u64>>>,
+
+    shared_value: Arc<RwLock<SharedValues>>,
     base_url: String,
     rest_client: reqwest::Client,
 }
@@ -154,13 +156,15 @@ impl Bot {
 
         return Ok(Self {
             private_cert: signing_key,
-            access_token: Arc::new(RwLock::new(None)),
-            refresh_token: Arc::new(RwLock::new(None)),
+            shared_value: Arc::new(RwLock::new(SharedValues {
+                access_token: None,
+                refresh_token: None,
+                refresh_expiration_time: None,
+            })),
             user_id: user_id,
 
             // auto_refresh_enabled: AtomicBool::new(false),
             refresh_handle: None,
-            refresh_expiration_time: Arc::new(RwLock::new(None)),
             base_url: final_base_url,
             rest_client,
         });
@@ -186,8 +190,8 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub async fn login(&mut self, auto_refresh: bool) -> Result<(), BotSdkError> {
         let login_req = LoginRequest {
-            organization: self.user_id.get_organization(),
-            user_id: self.user_id.get_full_id(),
+            organization: self.user_id.organization().to_string(),
+            user_id: self.user_id.full_id().to_string(),
             auth_method: "cra".to_string(),
         };
 
@@ -202,7 +206,7 @@ impl Bot {
 
         let hex_signed_challenge = hex::encode(signed_bytes);
         let login_req = CraRequest {
-            user_id: self.user_id.get_full_id(),
+            user_id: self.user_id.full_id().to_string(),
             challenge: response.challenge,
             response: hex_signed_challenge,
             hash_algorithm: http::HashAlgo::Sha256,
@@ -210,37 +214,22 @@ impl Bot {
 
         let cra_response = cra_login(&self.rest_client, login_req, &self.base_url).await?;
 
-        // Store tokens
-        let mut access_lock = self.access_token.write().await;
-        *access_lock = Some(cra_response.token);
-        drop(access_lock);
-
-        let mut refresh_lock = self.refresh_token.write().await;
-        *refresh_lock = Some(cra_response.refresh_token);
-        drop(refresh_lock);
-
-        let mut refresh_time_lock = self.refresh_expiration_time.write().await;
-        *refresh_time_lock = Some(cra_response.expires_at);
-        drop(refresh_time_lock);
+        let mut shared_value_lock = self.shared_value.write().await;
+        shared_value_lock.access_token = Some(cra_response.token);
+        shared_value_lock.refresh_token = Some(cra_response.refresh_token);
+        shared_value_lock.refresh_expiration_time = Some(cra_response.expires_at);
+        drop(shared_value_lock);
 
         self.cancel_refresh_task().await;
-        let refresh_handle = if auto_refresh {
+        self.refresh_handle = auto_refresh.then(|| {
             // Start the refresh task
-            let handle = tokio::spawn(auto_refresh_task(
+            tokio::spawn(auto_refresh_task(
                 self.rest_client.clone(),
                 self.base_url.clone(),
-                self.access_token.clone(),
-                self.refresh_token.clone(),
-                self.refresh_expiration_time.clone(),
+                self.shared_value.clone(),
                 cra_response.seconds.clone() - 10,
-            ));
-
-            Some(handle)
-        } else {
-            None
-        };
-
-        self.refresh_handle = refresh_handle;
+            ))
+        });
 
         Ok(())
     }
@@ -266,44 +255,33 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub async fn refresh(&mut self, auto_refresh: bool) -> Result<(), BotSdkError> {
         self.cancel_refresh_task().await;
-        let access_lock = self.access_token.read().await;
-        let refresh_lock = self.refresh_token.read().await;
+        let shared_lock = self.shared_value.read().await;
         let response = refresh_auth(
             &self.rest_client,
-            &refresh_lock,
-            &access_lock,
+            &shared_lock.refresh_token,
+            &shared_lock.access_token,
             &self.base_url,
         )
         .await?;
 
-        drop(access_lock);
-        drop(refresh_lock);
+        drop(shared_lock);
 
-        let mut access_lock = self.access_token.write().await;
-        *access_lock = Some(response.token);
+        let mut shared_value_lock = self.shared_value.write().await;
+        shared_value_lock.access_token = Some(response.token);
+        shared_value_lock.refresh_token = Some(response.refresh_token);
+        shared_value_lock.refresh_expiration_time = Some(response.expires_at);
+        drop(shared_value_lock);
 
-        let mut refresh_lock = self.refresh_token.write().await;
-        *refresh_lock = Some(response.refresh_token);
-
-        let mut refresh_time_lock = self.refresh_expiration_time.write().await;
-        *refresh_time_lock = Some(response.expires_at);
-        drop(refresh_time_lock);
-
-        let refresh_handle = if auto_refresh {
-            let handle = tokio::spawn(auto_refresh_task(
+        self.refresh_handle = auto_refresh.then(|| {
+            // Start the refresh task
+            tokio::spawn(auto_refresh_task(
                 self.rest_client.clone(),
                 self.base_url.clone(),
-                self.access_token.clone(),
-                self.refresh_token.clone(),
-                self.refresh_expiration_time.clone(),
+                self.shared_value.clone(),
                 response.seconds.clone() - 10,
-            ));
-            Some(handle)
-        } else {
-            None
-        };
+            ))
+        });
 
-        self.refresh_handle = refresh_handle;
         Ok(())
     }
 
@@ -326,8 +304,13 @@ impl Bot {
     ///
     /// # Note: uses tokio async runtime
     pub async fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
-        let access_lock = self.access_token.read().await;
-        let wallets = get_wallets(&self.rest_client, &access_lock, &self.base_url).await?;
+        let shared_access_lock = self.shared_value.read().await;
+        let wallets = get_wallets(
+            &self.rest_client,
+            &shared_access_lock.access_token,
+            &self.base_url,
+        )
+        .await?;
 
         Ok(wallets)
     }
@@ -357,11 +340,11 @@ impl Bot {
         tx_type: SignatureRequestKind,
         hex_value: String,
     ) -> Result<SigResponse, BotSdkError> {
-        let access_lock = self.access_token.read().await;
+        let shared_access_lock = self.shared_value.read().await;
 
         sign(
             &self.rest_client,
-            &access_lock,
+            &shared_access_lock.access_token,
             wallet_id,
             tx_type,
             hex_value,
@@ -389,17 +372,20 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub async fn logout(&mut self) -> Result<(), BotSdkError> {
         self.cancel_refresh_task().await;
-        let access_lock = self.access_token.read().await;
-        logout(&self.rest_client, &access_lock, &self.base_url).await?;
-        drop(access_lock);
+        let shared_access_lock = self.shared_value.read().await;
+        logout(
+            &self.rest_client,
+            &shared_access_lock.access_token,
+            &self.base_url,
+        )
+        .await?;
+        drop(shared_access_lock);
 
-        let mut access_lock = self.access_token.write().await;
-        *access_lock = None;
-
-        let mut refresh_lock = self.refresh_token.write().await;
-        *refresh_lock = None;
-        let mut expiration = self.refresh_expiration_time.write().await;
-        *expiration = None;
+        let mut shared_value_lock = self.shared_value.write().await;
+        shared_value_lock.access_token = None;
+        shared_value_lock.refresh_token = None;
+        shared_value_lock.refresh_expiration_time = None;
+        drop(shared_value_lock);
 
         Ok(())
     }
@@ -408,7 +394,6 @@ impl Bot {
         if let Some(thread_handle) = self.refresh_handle.take() {
             thread_handle.abort();
             let _ = thread_handle.await;
-            self.refresh_handle = None
         }
     }
 
@@ -428,7 +413,7 @@ impl Bot {
     /// bot.auth_expiration_unix_time().await;
     /// ```
     pub async fn auth_expiration_unix_time(&self) -> Option<u64> {
-        let expiration = self.refresh_expiration_time.read().await;
-        *expiration
+        let shared_value_lock = self.shared_value.read().await;
+        shared_value_lock.refresh_expiration_time
     }
 }
