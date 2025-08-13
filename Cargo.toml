@@ -22,15 +22,19 @@ hex = "0.4.3"
 serde_json = "1.0.140"
 log = "0.4.27"
 parking_lot = { version = "0.12.4", features = ["arc_lock"] }
+secp256k1 = "0.31.1"
+
+[dev-dependencies]
+criterion = "0.5"
 
 [lib]
 name = "crypdefi_bot_sdk"
 path = "src/lib.rs"
 
 
-[[bin]]
-name = "crypdefi-bot"
-path = "src/bot.rs"
+[[bench]]
+name = "signature_benchmark"
+harness = false
 
 
 [lints.rust]

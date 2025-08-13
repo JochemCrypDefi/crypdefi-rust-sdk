@@ -134,7 +134,7 @@ impl Bot {
     ///
     /// NOTE: unless changed endpoint will default to: https://api.release.crypdefi.eu.  
     /// ```
-    pub async fn new(
+    pub fn new(
         pem_key: String,
         user_id: UserId,
         base_url: Option<String>,

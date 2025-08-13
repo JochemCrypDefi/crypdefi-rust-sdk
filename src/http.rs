@@ -1,4 +1,5 @@
 use crate::error::BotSdkError;
+use secp256k1::ecdsa::{self, SerializedSignature};
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_URL: &str = "https://api.release.crypdefi.eu";
@@ -215,6 +216,16 @@ impl Signature {
         der[1] = der.len() as u8 - 2;
 
         Ok(der)
+    }
+    pub fn secp_der(&self) -> Result<SerializedSignature, BotSdkError> {
+        let r_bytes = hex::decode(&self.r)?;
+        let s_bytes = hex::decode(&self.s)?;
+
+        let mut compact_rebuild = [0u8; 64];
+        compact_rebuild[..32].copy_from_slice(&r_bytes);
+        compact_rebuild[32..].copy_from_slice(&s_bytes);
+        let sig = ecdsa::Signature::from_compact(&compact_rebuild)?;
+        return Ok(sig.serialize_der());
     }
 }
 

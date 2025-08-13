@@ -19,8 +19,7 @@ nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
         ),
         user_id,
         Some(String::from("https://api.sandbox.crypdefi.eu")),
-    )
-    .await?;
+    )?;
 
     println!("Bot: {:?}", bot);
     bot.login(true).await?;
@@ -40,6 +39,11 @@ nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
         println!(
             "\n der hex signature: {:?}",
             hex::encode(signature.signature.to_der()?)
+        );
+
+        println!(
+            "\n der hex secp signature: {:?}",
+            hex::encode(signature.signature.secp_der()?)
         );
 
         // println!("refreshing");
