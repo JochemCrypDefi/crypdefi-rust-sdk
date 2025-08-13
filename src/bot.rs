@@ -34,16 +34,16 @@ nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
         println!("signature: {:?}", signature);
         println!(
             "\n payload being signed: {:?}",
-            hex::encode(signature.payload.raw_bytes.unwrap())
+            const_hex::encode(signature.payload.raw_bytes.unwrap())
         );
         println!(
             "\n der hex signature: {:?}",
-            hex::encode(signature.signature.to_der()?)
+            const_hex::encode(signature.signature.to_der()?)
         );
 
         println!(
             "\n der hex secp signature: {:?}",
-            hex::encode(signature.signature.secp_der()?)
+            const_hex::encode(signature.signature.secp_der()?)
         );
 
         // println!("refreshing");

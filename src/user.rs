@@ -197,14 +197,14 @@ impl Bot {
 
         let response = login(&self.rest_client, login_req, &self.base_url).await?;
 
-        let challenge_bytes = hex::decode(response.challenge.clone())?;
+        let challenge_bytes = const_hex::decode(response.challenge.clone())?;
 
         let signed_challenge =
             sign_challenge_with_ecdsa(self.private_cert.clone(), challenge_bytes)?;
 
         let signed_bytes = signed_challenge.to_der()?;
 
-        let hex_signed_challenge = hex::encode(signed_bytes);
+        let hex_signed_challenge = const_hex::encode(signed_bytes);
         let login_req = CraRequest {
             user_id: self.user_id.full_id().to_string(),
             challenge: response.challenge,

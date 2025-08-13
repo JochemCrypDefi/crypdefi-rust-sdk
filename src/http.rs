@@ -201,8 +201,8 @@ fn encode_integer(bytes: &[u8], buff: &mut Vec<u8>) {
 impl Signature {
     pub fn to_der(&self) -> Result<Vec<u8>, BotSdkError> {
         // Convert hex strings to byte vectors
-        let r_bytes = hex::decode(&self.r)?;
-        let s_bytes = hex::decode(&self.s)?;
+        let r_bytes = const_hex::decode(&self.r)?;
+        let s_bytes = const_hex::decode(&self.s)?;
 
         let mut der = Vec::with_capacity(128);
 
@@ -218,13 +218,11 @@ impl Signature {
         Ok(der)
     }
     pub fn secp_der(&self) -> Result<SerializedSignature, BotSdkError> {
-        let r_bytes = hex::decode(&self.r)?;
-        let s_bytes = hex::decode(&self.s)?;
+        let mut data = [8u8; 64];
+        const_hex::decode_to_slice(&self.r, &mut data[..32])?;
+        const_hex::decode_to_slice(&self.s, &mut data[32..])?;
 
-        let mut compact_rebuild = [0u8; 64];
-        compact_rebuild[..32].copy_from_slice(&r_bytes);
-        compact_rebuild[32..].copy_from_slice(&s_bytes);
-        let sig = ecdsa::Signature::from_compact(&compact_rebuild)?;
+        let sig = ecdsa::Signature::from_compact(&data)?;
         return Ok(sig.serialize_der());
     }
 }
@@ -396,7 +394,7 @@ mod tests {
         };
 
         let der_result = signature.to_der().unwrap();
-        let der_hex = hex::encode(&der_result);
+        let der_hex = const_hex::encode(&der_result);
 
         let expected_der_hex = "3045022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c902204a28dc564d87e36871d032a208ccef1229a8c95875928f867d77daa21991ca2e";
 
@@ -411,7 +409,7 @@ mod tests {
         };
 
         let der_result = signature.to_der().unwrap();
-        let der_hex = hex::encode(&der_result);
+        let der_hex = const_hex::encode(&der_result);
 
         let expected_der_hex = "3045022100d12c949a67ebdaf38350fda2b6d4e0e2bb8a8c8160cfbc6487a3719e2187dd02022018f9b3eb182ef670832698f57dc663ddf0501e202aa90865d13abe12e2cd7559";
 
@@ -421,32 +419,36 @@ mod tests {
     #[test]
     fn test_encode_integer_positive() {
         // Test with a positive number that doesn't need padding
-        let bytes = hex::decode("bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
-            .unwrap();
+        let bytes =
+            const_hex::decode("bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
+                .unwrap();
         let mut buffer = Vec::new();
 
         encode_integer(&bytes, &mut buffer);
 
-        let expected =
-            hex::decode("022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
-                .unwrap();
+        let expected = const_hex::decode(
+            "022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9",
+        )
+        .unwrap();
         assert_eq!(buffer, expected);
     }
 
     #[test]
     fn test_encode_integer_remove_leading_zeros() {
         // Test removing leading zeros (but keeping at least one)
-        let bytes =
-            hex::decode("0000bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
-                .unwrap();
+        let bytes = const_hex::decode(
+            "0000bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9",
+        )
+        .unwrap();
         let mut buffer = Vec::new();
 
         encode_integer(&bytes, &mut buffer);
 
         // Should remove leading zeros
-        let expected =
-            hex::decode("022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
-                .unwrap();
+        let expected = const_hex::decode(
+            "022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9",
+        )
+        .unwrap();
         assert_eq!(buffer, expected);
     }
 }
