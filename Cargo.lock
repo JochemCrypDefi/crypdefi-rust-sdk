@@ -324,7 +324,6 @@ dependencies = [
  "criterion",
  "log",
  "p256",
- "parking_lot",
  "pem",
  "pkcs8",
  "reqwest",
