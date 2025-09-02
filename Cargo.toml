@@ -35,10 +35,6 @@ name = "crypdefi-bot"
 path = "src/bot.rs"
 
 
-[[bench]]
-name = "signature_benchmark"
-harness = false
-
 
 [lints.rust]
 unreachable_pub = "warn"

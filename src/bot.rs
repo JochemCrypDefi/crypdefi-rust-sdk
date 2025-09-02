@@ -41,10 +41,6 @@ nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
             const_hex::encode(signature.signature.to_der()?)
         );
 
-        println!(
-            "\n der hex secp signature: {:?}",
-            const_hex::encode(signature.signature.secp_der()?)
-        );
 
         // println!("refreshing");
         // let result = bot.refresh(true).await?;

@@ -178,46 +178,8 @@ pub struct Signature {
     pub recovery_id: Option<u64>,
 }
 
-fn encode_integer(bytes: &[u8], buff: &mut Vec<u8>) {
-    buff.push(0x02); // Integer tag
-
-    // Remove leading zeros, but ensure at least one byte remains
-    let mut trimmed = bytes;
-    while trimmed.len() > 1 && trimmed[0] == 0 {
-        trimmed = &trimmed[1..];
-    }
-
-    // If the first bit is 1, prepend a 0x00 to avoid interpreting as negative
-    if trimmed[0] & 0x80 != 0 {
-        buff.push((trimmed.len() + 1) as u8); // Length includes the extra 0x00
-        buff.push(0x00);
-    } else {
-        buff.push(trimmed.len() as u8); // Length of the integer
-    }
-
-    buff.extend_from_slice(trimmed);
-}
-
 impl Signature {
-    pub fn to_der(&self) -> Result<Vec<u8>, BotSdkError> {
-        // Convert hex strings to byte vectors
-        let r_bytes = const_hex::decode(&self.r)?;
-        let s_bytes = const_hex::decode(&self.s)?;
-
-        let mut der = Vec::with_capacity(128);
-
-        // Byte 0 is sequence tag 0x30, byte 1 is the length which we don't yet know, we'll edit later
-        der.extend_from_slice(&[0x30, 0]);
-
-        // Append encoded integer
-        encode_integer(&r_bytes, &mut der);
-        encode_integer(&s_bytes, &mut der);
-
-        der[1] = der.len() as u8 - 2;
-
-        Ok(der)
-    }
-    pub fn secp_der(&self) -> Result<SerializedSignature, BotSdkError> {
+    pub fn to_der(&self) -> Result<SerializedSignature, BotSdkError> {
         let mut data = [8u8; 64];
         const_hex::decode_to_slice(&self.r, &mut data[..32])?;
         const_hex::decode_to_slice(&self.s, &mut data[32..])?;
@@ -414,41 +376,5 @@ mod tests {
         let expected_der_hex = "3045022100d12c949a67ebdaf38350fda2b6d4e0e2bb8a8c8160cfbc6487a3719e2187dd02022018f9b3eb182ef670832698f57dc663ddf0501e202aa90865d13abe12e2cd7559";
 
         assert_eq!(der_hex, expected_der_hex);
-    }
-
-    #[test]
-    fn test_encode_integer_positive() {
-        // Test with a positive number that doesn't need padding
-        let bytes =
-            const_hex::decode("bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9")
-                .unwrap();
-        let mut buffer = Vec::new();
-
-        encode_integer(&bytes, &mut buffer);
-
-        let expected = const_hex::decode(
-            "022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9",
-        )
-        .unwrap();
-        assert_eq!(buffer, expected);
-    }
-
-    #[test]
-    fn test_encode_integer_remove_leading_zeros() {
-        // Test removing leading zeros (but keeping at least one)
-        let bytes = const_hex::decode(
-            "0000bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9",
-        )
-        .unwrap();
-        let mut buffer = Vec::new();
-
-        encode_integer(&bytes, &mut buffer);
-
-        // Should remove leading zeros
-        let expected = const_hex::decode(
-            "022100bc87e27ae505b41bab7f228a60205f61756b3f5ba67ad33fd35664731720a0c9",
-        )
-        .unwrap();
-        assert_eq!(buffer, expected);
     }
 }
