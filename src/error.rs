@@ -34,7 +34,10 @@ pub enum BotSdkError {
     IdNotUserId,
 
     #[error("Coudl not decode hex error")]
-    HxError(#[from] hex::FromHexError),
+    HxError(#[from] const_hex::FromHexError),
+
+    #[error("Secp256k1 ecdsa error")]
+    Secp256k1Error(#[from] secp256k1::Error),
 
     #[error("Somethin happened that required a custom error: {0}")]
     Custom(String),

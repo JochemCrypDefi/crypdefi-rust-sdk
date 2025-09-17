@@ -19,8 +19,7 @@ nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
         ),
         user_id,
         Some(String::from("https://api.sandbox.crypdefi.eu")),
-    )
-    .await?;
+    )?;
 
     println!("Bot: {:?}", bot);
     bot.login(true).await?;
@@ -35,12 +34,13 @@ nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
         println!("signature: {:?}", signature);
         println!(
             "\n payload being signed: {:?}",
-            hex::encode(signature.payload.raw_bytes.unwrap())
+            const_hex::encode(signature.payload.raw_bytes.unwrap())
         );
         println!(
             "\n der hex signature: {:?}",
-            hex::encode(signature.signature.to_der()?)
+            const_hex::encode(signature.signature.to_der()?)
         );
+
 
         // println!("refreshing");
         // let result = bot.refresh(true).await?;
