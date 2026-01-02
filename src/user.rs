@@ -11,6 +11,7 @@ use pkcs8::{DecodePrivateKey, der::Encode};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+use tokio::task::AbortHandle;
 
 fn sign_challenge_with_ecdsa(
     signing_key: SigningKey,
@@ -110,7 +111,7 @@ struct SharedValues {
 pub struct Bot {
     private_cert: SigningKey,
     user_id: UserId,
-    refresh_handle: Option<tokio::task::JoinHandle<()>>,
+    refresh_handle: Option<AbortHandle>,
 
     shared_value: Arc<RwLock<SharedValues>>,
     base_url: String,
@@ -220,7 +221,7 @@ impl Bot {
         shared_value_lock.refresh_expiration_time = Some(cra_response.expires_at);
         drop(shared_value_lock);
 
-        self.cancel_refresh_task().await;
+        self.cancel_refresh_task();
         self.refresh_handle = auto_refresh.then(|| {
             // Start the refresh task
             tokio::spawn(auto_refresh_task(
@@ -229,12 +230,13 @@ impl Bot {
                 self.shared_value.clone(),
                 cra_response.seconds.clone() - 10,
             ))
+            .abort_handle()
         });
 
         Ok(())
     }
 
-    /// Manually refreshes the bot’s access token. Only needed if auto-refresh is disabled.
+    /// Manually refreshes the bot's access token. Only needed if auto-refresh is disabled.
     ///
     /// # Example
     /// ```rust
@@ -254,7 +256,7 @@ impl Bot {
     ///
     /// # Note: uses tokio async runtime
     pub async fn refresh(&mut self, auto_refresh: bool) -> Result<(), BotSdkError> {
-        self.cancel_refresh_task().await;
+        self.cancel_refresh_task();
         let shared_lock = self.shared_value.read().await;
         let response = refresh_auth(
             &self.rest_client,
@@ -280,6 +282,7 @@ impl Bot {
                 self.shared_value.clone(),
                 response.seconds.clone() - 10,
             ))
+            .abort_handle()
         });
 
         Ok(())
@@ -371,7 +374,7 @@ impl Bot {
     ///
     /// # Note: uses tokio async runtime
     pub async fn logout(&mut self) -> Result<(), BotSdkError> {
-        self.cancel_refresh_task().await;
+        self.cancel_refresh_task();
         let shared_access_lock = self.shared_value.read().await;
         logout(
             &self.rest_client,
@@ -390,10 +393,9 @@ impl Bot {
         Ok(())
     }
 
-    async fn cancel_refresh_task(&mut self) {
-        if let Some(thread_handle) = self.refresh_handle.take() {
-            thread_handle.abort();
-            let _ = thread_handle.await;
+    fn cancel_refresh_task(&mut self) {
+        if let Some(handle) = self.refresh_handle.take() {
+            handle.abort();
         }
     }
 
@@ -415,5 +417,13 @@ impl Bot {
     pub async fn auth_expiration_unix_time(&self) -> Option<u64> {
         let shared_value_lock = self.shared_value.read().await;
         shared_value_lock.refresh_expiration_time
+    }
+}
+
+impl Drop for Bot {
+    fn drop(&mut self) {
+        if let Some(handle) = self.refresh_handle.take() {
+            handle.abort();
+        }
     }
 }
