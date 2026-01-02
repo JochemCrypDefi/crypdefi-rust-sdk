@@ -221,17 +221,7 @@ impl Bot {
         shared_value_lock.refresh_expiration_time = Some(cra_response.expires_at);
         drop(shared_value_lock);
 
-        self.cancel_refresh_task();
-        self.refresh_handle = auto_refresh.then(|| {
-            // Start the refresh task
-            tokio::spawn(auto_refresh_task(
-                self.rest_client.clone(),
-                self.base_url.clone(),
-                self.shared_value.clone(),
-                cra_response.seconds.clone() - 10,
-            ))
-            .abort_handle()
-        });
+        self.start_refresh_task(auto_refresh, cra_response.seconds - 10);
 
         Ok(())
     }
@@ -274,16 +264,7 @@ impl Bot {
         shared_value_lock.refresh_expiration_time = Some(response.expires_at);
         drop(shared_value_lock);
 
-        self.refresh_handle = auto_refresh.then(|| {
-            // Start the refresh task
-            tokio::spawn(auto_refresh_task(
-                self.rest_client.clone(),
-                self.base_url.clone(),
-                self.shared_value.clone(),
-                response.seconds.clone() - 10,
-            ))
-            .abort_handle()
-        });
+        self.start_refresh_task(auto_refresh, response.seconds - 10);
 
         Ok(())
     }
@@ -399,6 +380,29 @@ impl Bot {
         }
     }
 
+    fn start_refresh_task(&mut self, auto_refresh: bool, refresh_in_seconds: u64) {
+        self.cancel_refresh_task();
+        self.refresh_handle = auto_refresh.then(|| {
+            tokio::spawn(auto_refresh_task(
+                self.rest_client.clone(),
+                self.base_url.clone(),
+                self.shared_value.clone(),
+                refresh_in_seconds,
+            ))
+            .abort_handle()
+        });
+    }
+}
+
+impl Drop for Bot {
+    fn drop(&mut self) {
+        if let Some(handle) = self.refresh_handle.take() {
+            handle.abort();
+        }
+    }
+}
+
+impl Bot {
     ///  Returns the Unix timestamp when the current auth token will expire.
     ///
     /// # Example
@@ -417,13 +421,5 @@ impl Bot {
     pub async fn auth_expiration_unix_time(&self) -> Option<u64> {
         let shared_value_lock = self.shared_value.read().await;
         shared_value_lock.refresh_expiration_time
-    }
-}
-
-impl Drop for Bot {
-    fn drop(&mut self) {
-        if let Some(handle) = self.refresh_handle.take() {
-            handle.abort();
-        }
     }
 }

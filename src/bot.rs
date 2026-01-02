@@ -41,7 +41,6 @@ nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
             const_hex::encode(signature.signature.to_der()?)
         );
 
-
         // println!("refreshing");
         // let result = bot.refresh(true).await?;
         // println!("refresh result: {:?}", result);
