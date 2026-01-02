@@ -38,7 +38,7 @@ openssl pkcs8 -in bot_private_key.key -inform pem -topk8 -nocrypt -out bot_priva
 ### Instantiating a Bot
 
 ```rust
-use crypdefi_bot_sdk::crypdefi::user::Bot;
+use crypdefi_bot_sdk::user::{Bot, UserId};
 use std::fs;
 
 // --------------------------- CONFIG ---------------------------
@@ -99,7 +99,7 @@ println!("Signature: {:?}\n", signature);
  
 // --------------------------- REFRESH SESSION ---------------------------
 println!("Refreshing Bot session...");
-let refresh_result = bot.refresh().await.unwrap();
+let refresh_result = bot.refresh(false).await.unwrap();
 println!("Refresh result: {:?}\n", refresh_result);
  
 // --------------------------- LOGOUT ---------------------------
