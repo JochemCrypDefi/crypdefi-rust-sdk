@@ -56,10 +56,11 @@ impl UserId {
     }
 
     pub fn organization(&self) -> &str {
-        return &self.organization;
+        &self.organization
     }
+
     pub fn full_id(&self) -> &str {
-        return &self.full_id;
+        &self.full_id
     }
 }
 
@@ -142,11 +143,7 @@ impl Bot {
     ) -> Result<Self, BotSdkError> {
         let signing_key = SigningKey::from_pkcs8_pem(pem_key.as_str())?;
 
-        let mut final_base_url = String::from(http::DEFAULT_URL);
-
-        if let Some(url) = base_url {
-            final_base_url = url;
-        }
+        let final_base_url = base_url.unwrap_or_else(|| String::from(http::DEFAULT_URL));
 
         let rest_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(5))
@@ -155,20 +152,18 @@ impl Bot {
             .http2_keep_alive_while_idle(true)
             .build()?;
 
-        return Ok(Self {
+        Ok(Self {
             private_cert: signing_key,
             shared_value: Arc::new(RwLock::new(SharedValues {
                 access_token: None,
                 refresh_token: None,
                 refresh_expiration_time: None,
             })),
-            user_id: user_id,
-
-            // auto_refresh_enabled: AtomicBool::new(false),
+            user_id,
             refresh_handle: None,
             base_url: final_base_url,
             rest_client,
-        });
+        })
     }
 
     /// Authenticates the bot using the provided user ID. If `auto_refresh` is enabled, the SDK will handle token renewal automatically.
@@ -403,7 +398,7 @@ impl Drop for Bot {
 }
 
 impl Bot {
-    ///  Returns the Unix timestamp when the current auth token will expire.
+    /// Returns the Unix timestamp when the current auth token will expire.
     ///
     /// # Example
     /// ```rust

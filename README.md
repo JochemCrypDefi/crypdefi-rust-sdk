@@ -110,7 +110,7 @@ println!("Logout result: {:?}", logout_result);
 ```
 ## Contributors
 
-This are commands and tools for developers of the SDK.
+These are commands and tools for developers of the SDK.
 
 You will need to have the static library somewhere in the file system.
 
