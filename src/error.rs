@@ -12,13 +12,13 @@ pub enum BotSdkError {
     #[error("Something happened during ecdsa signature operation")]
     EcdsaError(#[from] p256::ecdsa::Error),
 
-    #[error("Error of durin rest request")]
+    #[error("Error of during rest request")]
     RequestError(#[from] reqwest::Error),
 
     #[error("Error during json parsing")]
     SerdeJsonError(#[from] serde_json::Error),
 
-    #[error("Error ruing enviroment variable checking")]
+    #[error("Error ruing environment variable checking")]
     VarError(#[from] env::VarError),
 
     #[error("There is no access token available")]
