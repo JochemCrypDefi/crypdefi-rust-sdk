@@ -11,6 +11,7 @@ use pkcs8::{DecodePrivateKey, der::Encode};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+use tokio::task::AbortHandle;
 
 fn sign_challenge_with_ecdsa(
     signing_key: SigningKey,
@@ -55,10 +56,11 @@ impl UserId {
     }
 
     pub fn organization(&self) -> &str {
-        return &self.organization;
+        &self.organization
     }
+
     pub fn full_id(&self) -> &str {
-        return &self.full_id;
+        &self.full_id
     }
 }
 
@@ -66,7 +68,6 @@ async fn auto_refresh_task(
     client: reqwest::Client,
     base_url: String,
     shared_values_rw: Arc<RwLock<SharedValues>>,
-
     seconds: u64,
 ) {
     loop {
@@ -110,7 +111,7 @@ struct SharedValues {
 pub struct Bot {
     private_cert: SigningKey,
     user_id: UserId,
-    refresh_handle: Option<tokio::task::JoinHandle<()>>,
+    refresh_handle: Option<AbortHandle>,
 
     shared_value: Arc<RwLock<SharedValues>>,
     base_url: String,
@@ -141,11 +142,7 @@ impl Bot {
     ) -> Result<Self, BotSdkError> {
         let signing_key = SigningKey::from_pkcs8_pem(pem_key.as_str())?;
 
-        let mut final_base_url = String::from(http::DEFAULT_URL);
-
-        if let Some(url) = base_url {
-            final_base_url = url;
-        }
+        let final_base_url = base_url.unwrap_or_else(|| String::from(http::DEFAULT_URL));
 
         let rest_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(5))
@@ -154,20 +151,18 @@ impl Bot {
             .http2_keep_alive_while_idle(true)
             .build()?;
 
-        return Ok(Self {
+        Ok(Self {
             private_cert: signing_key,
             shared_value: Arc::new(RwLock::new(SharedValues {
                 access_token: None,
                 refresh_token: None,
                 refresh_expiration_time: None,
             })),
-            user_id: user_id,
-
-            // auto_refresh_enabled: AtomicBool::new(false),
+            user_id,
             refresh_handle: None,
             base_url: final_base_url,
             rest_client,
-        });
+        })
     }
 
     /// Authenticates the bot using the provided user ID. If `auto_refresh` is enabled, the SDK will handle token renewal automatically.
@@ -220,21 +215,12 @@ impl Bot {
         shared_value_lock.refresh_expiration_time = Some(cra_response.expires_at);
         drop(shared_value_lock);
 
-        self.cancel_refresh_task().await;
-        self.refresh_handle = auto_refresh.then(|| {
-            // Start the refresh task
-            tokio::spawn(auto_refresh_task(
-                self.rest_client.clone(),
-                self.base_url.clone(),
-                self.shared_value.clone(),
-                cra_response.seconds.clone() - 10,
-            ))
-        });
+        self.start_refresh_task(auto_refresh, cra_response.seconds - 10);
 
         Ok(())
     }
 
-    /// Manually refreshes the bot’s access token. Only needed if auto-refresh is disabled.
+    /// Manually refreshes the bot's access token. Only needed if auto-refresh is disabled.
     ///
     /// # Example
     /// ```rust
@@ -254,7 +240,7 @@ impl Bot {
     ///
     /// # Note: uses tokio async runtime
     pub async fn refresh(&mut self, auto_refresh: bool) -> Result<(), BotSdkError> {
-        self.cancel_refresh_task().await;
+        self.cancel_refresh_task();
         let shared_lock = self.shared_value.read().await;
         let response = refresh_auth(
             &self.rest_client,
@@ -272,15 +258,7 @@ impl Bot {
         shared_value_lock.refresh_expiration_time = Some(response.expires_at);
         drop(shared_value_lock);
 
-        self.refresh_handle = auto_refresh.then(|| {
-            // Start the refresh task
-            tokio::spawn(auto_refresh_task(
-                self.rest_client.clone(),
-                self.base_url.clone(),
-                self.shared_value.clone(),
-                response.seconds.clone() - 10,
-            ))
-        });
+        self.start_refresh_task(auto_refresh, response.seconds - 10);
 
         Ok(())
     }
@@ -371,7 +349,7 @@ impl Bot {
     ///
     /// # Note: uses tokio async runtime
     pub async fn logout(&mut self) -> Result<(), BotSdkError> {
-        self.cancel_refresh_task().await;
+        self.cancel_refresh_task();
         let shared_access_lock = self.shared_value.read().await;
         logout(
             &self.rest_client,
@@ -390,14 +368,36 @@ impl Bot {
         Ok(())
     }
 
-    async fn cancel_refresh_task(&mut self) {
-        if let Some(thread_handle) = self.refresh_handle.take() {
-            thread_handle.abort();
-            let _ = thread_handle.await;
+    fn cancel_refresh_task(&mut self) {
+        if let Some(handle) = self.refresh_handle.take() {
+            handle.abort();
         }
     }
 
-    ///  Returns the Unix timestamp when the current auth token will expire.
+    fn start_refresh_task(&mut self, auto_refresh: bool, refresh_in_seconds: u64) {
+        self.cancel_refresh_task();
+        self.refresh_handle = auto_refresh.then(|| {
+            tokio::spawn(auto_refresh_task(
+                self.rest_client.clone(),
+                self.base_url.clone(),
+                self.shared_value.clone(),
+                refresh_in_seconds,
+            ))
+            .abort_handle()
+        });
+    }
+}
+
+impl Drop for Bot {
+    fn drop(&mut self) {
+        if let Some(handle) = self.refresh_handle.take() {
+            handle.abort();
+        }
+    }
+}
+
+impl Bot {
+    /// Returns the Unix timestamp when the current auth token will expire.
     ///
     /// # Example
     /// ```rust

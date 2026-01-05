@@ -12,13 +12,13 @@ pub enum BotSdkError {
     #[error("Something happened during ecdsa signature operation")]
     EcdsaError(#[from] p256::ecdsa::Error),
 
-    #[error("Error of durin rest request")]
+    #[error("Error of during rest request")]
     RequestError(#[from] reqwest::Error),
 
     #[error("Error during json parsing")]
     SerdeJsonError(#[from] serde_json::Error),
 
-    #[error("Error ruing enviroment variable checking")]
+    #[error("Error during environment variable checking")]
     VarError(#[from] env::VarError),
 
     #[error("There is no access token available")]
@@ -33,12 +33,12 @@ pub enum BotSdkError {
     #[error("Id is not a user id. User Id starts with 'us'")]
     IdNotUserId,
 
-    #[error("Coudl not decode hex error")]
+    #[error("Could not decode hex error")]
     HxError(#[from] const_hex::FromHexError),
 
     #[error("Secp256k1 ecdsa error")]
     Secp256k1Error(#[from] secp256k1::Error),
 
-    #[error("Somethin happened that required a custom error: {0}")]
+    #[error("Something happened that required a custom error: {0}")]
     Custom(String),
 }

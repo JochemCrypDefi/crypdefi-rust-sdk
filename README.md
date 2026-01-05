@@ -38,7 +38,7 @@ openssl pkcs8 -in bot_private_key.key -inform pem -topk8 -nocrypt -out bot_priva
 ### Instantiating a Bot
 
 ```rust
-use crypdefi_bot_sdk::crypdefi::user::Bot;
+use crypdefi_bot_sdk::user::{Bot, UserId};
 use std::fs;
 
 // --------------------------- CONFIG ---------------------------
@@ -98,9 +98,9 @@ let signature = bot.sign_transaction(
 println!("Signature: {:?}\n", signature);
  
 // --------------------------- REFRESH SESSION ---------------------------
+// Pass `true` to enable auto-refresh (recommended for long-running bots)
 println!("Refreshing Bot session...");
-let refresh_result = bot.refresh().await.unwrap();
-println!("Refresh result: {:?}\n", refresh_result);
+bot.refresh(true).await.unwrap();
  
 // --------------------------- LOGOUT ---------------------------
 let logout_result = bot.logout().await.unwrap();
@@ -110,7 +110,7 @@ println!("Logout result: {:?}", logout_result);
 ```
 ## Contributors
 
-This are commands and tools for developers of the SDK.
+These are commands and tools for developers of the SDK.
 
 You will need to have the static library somewhere in the file system.
 
