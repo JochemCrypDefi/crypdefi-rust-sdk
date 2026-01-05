@@ -33,7 +33,7 @@ pub enum BotSdkError {
     #[error("Id is not a user id. User Id starts with 'us'")]
     IdNotUserId,
 
-    #[error("Coudl not decode hex error")]
+    #[error("Could not decode hex error")]
     HxError(#[from] const_hex::FromHexError),
 
     #[error("Secp256k1 ecdsa error")]
