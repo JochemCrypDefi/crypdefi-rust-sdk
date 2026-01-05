@@ -18,7 +18,7 @@ pub enum BotSdkError {
     #[error("Error during json parsing")]
     SerdeJsonError(#[from] serde_json::Error),
 
-    #[error("Error ruing environment variable checking")]
+    #[error("Error during environment variable checking")]
     VarError(#[from] env::VarError),
 
     #[error("There is no access token available")]
