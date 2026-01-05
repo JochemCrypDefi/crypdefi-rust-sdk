@@ -68,7 +68,6 @@ async fn auto_refresh_task(
     client: reqwest::Client,
     base_url: String,
     shared_values_rw: Arc<RwLock<SharedValues>>,
-
     seconds: u64,
 ) {
     loop {
