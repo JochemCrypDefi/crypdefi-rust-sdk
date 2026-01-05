@@ -98,9 +98,9 @@ let signature = bot.sign_transaction(
 println!("Signature: {:?}\n", signature);
  
 // --------------------------- REFRESH SESSION ---------------------------
+// Pass `true` to enable auto-refresh (recommended for long-running bots)
 println!("Refreshing Bot session...");
-let refresh_result = bot.refresh(false).await.unwrap();
-println!("Refresh result: {:?}\n", refresh_result);
+bot.refresh(true).await.unwrap();
  
 // --------------------------- LOGOUT ---------------------------
 let logout_result = bot.logout().await.unwrap();
