@@ -39,6 +39,6 @@ pub enum BotSdkError {
     #[error("Secp256k1 ecdsa error")]
     Secp256k1Error(#[from] secp256k1::Error),
 
-    #[error("Somethin happened that required a custom error: {0}")]
+    #[error("Something happened that required a custom error: {0}")]
     Custom(String),
 }
