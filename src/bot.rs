@@ -12,10 +12,7 @@ async fn main() -> Result<(), BotSdkError> {
     let mut bot = Bot::new(
         String::from(
             "-----BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXQP2Nr18sJuL7BiO
-E+jpJnxOH/5nIg6Nk8HJtL7dlNOhRANCAARLFq3OvO/McpHQud7nLUAgo+wv64kL
-nIgrbZYBLkODZwt4/3AlcQuZTpBNqLpF62plLLV+9RJffQndWaiGFNff
------END PRIVATE KEY-----",
+            -----END PRIVATE KEY-----",
         ),
         user_id,
         Some(String::from("https://api.sandbox.crypdefi.eu")),
