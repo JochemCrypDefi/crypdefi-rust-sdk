@@ -1,5 +1,5 @@
 use crate::http::{
-    self, SigResponse, SignatureRequestKind, get_wallets, logout, refresh_auth, sign,
+    self, SigResponse, SignatureRequestKind, get_wallets, logout, refresh_auth, sign, warmup_connection,
 };
 use crate::{
     error::BotSdkError,
@@ -115,6 +115,7 @@ pub struct Bot {
 
     shared_value: Arc<RwLock<SharedValues>>,
     base_url: String,
+    sign_url: String,
     rest_client: reqwest::Client,
 }
 
@@ -139,10 +140,12 @@ impl Bot {
         pem_key: String,
         user_id: UserId,
         base_url: Option<String>,
+        sign_url: Option<String>
     ) -> Result<Self, BotSdkError> {
         let signing_key = SigningKey::from_pkcs8_pem(pem_key.as_str())?;
 
         let final_base_url = base_url.unwrap_or_else(|| String::from(http::DEFAULT_URL));
+        let final_sign_url: String = sign_url.unwrap_or_else(|| final_base_url.clone());
 
         let rest_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(5))
@@ -161,6 +164,7 @@ impl Bot {
             user_id,
             refresh_handle: None,
             base_url: final_base_url,
+            sign_url: final_sign_url,
             rest_client,
         })
     }
@@ -216,6 +220,11 @@ impl Bot {
         drop(shared_value_lock);
 
         self.start_refresh_task(auto_refresh, cra_response.seconds - 10);
+        
+        // warm up signing endpoint
+        if self.base_url != self.sign_url {
+            warmup_connection(&self.rest_client, &self.sign_url).await?;
+        }
 
         Ok(())
     }
@@ -326,7 +335,7 @@ impl Bot {
             wallet_id,
             tx_type,
             hex_value,
-            &self.base_url,
+            &self.sign_url,
         )
         .await
     }
