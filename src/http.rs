@@ -59,7 +59,7 @@ pub async fn warmup_connection(client: &reqwest::Client, url: &str) -> Result<()
     }
 
     let status = response.status();
-    let res = response.text().await?;
+    let res: String = response.text().await?;
 
     Err(BotSdkError::Custom(format!(
         "{}.\n Status: {} \n Body: {}",

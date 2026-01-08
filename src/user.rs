@@ -1,5 +1,6 @@
 use crate::http::{
-    self, SigResponse, SignatureRequestKind, get_wallets, logout, refresh_auth, sign, warmup_connection,
+    self, SigResponse, SignatureRequestKind, get_wallets, logout, refresh_auth, sign,
+    warmup_connection,
 };
 use crate::{
     error::BotSdkError,
@@ -140,7 +141,7 @@ impl Bot {
         pem_key: String,
         user_id: UserId,
         base_url: Option<String>,
-        sign_url: Option<String>
+        sign_url: Option<String>,
     ) -> Result<Self, BotSdkError> {
         let signing_key = SigningKey::from_pkcs8_pem(pem_key.as_str())?;
 
@@ -220,10 +221,12 @@ impl Bot {
         drop(shared_value_lock);
 
         self.start_refresh_task(auto_refresh, cra_response.seconds - 10);
-        
+
         // warm up signing endpoint
         if self.base_url != self.sign_url {
-            warmup_connection(&self.rest_client, &self.sign_url).await?;
+            if let Err(e) = warmup_connection(&self.rest_client, &self.sign_url).await {
+                tracing::warn!("warmup on signing endpoint failed: {}", e);
+            }
         }
 
         Ok(())
