@@ -50,6 +50,23 @@ pub async fn login(
     )))
 }
 
+pub async fn warmup_connection(client: &reqwest::Client, url: &str) -> Result<(), BotSdkError> {
+    let url = set_url(url, "/health");
+    let response = client.get(url).send().await?;
+
+    if response.status().is_success() {
+        return Ok(());
+    }
+
+    let status = response.status();
+    let res: String = response.text().await?;
+
+    Err(BotSdkError::Custom(format!(
+        "{}.\n Status: {} \n Body: {}",
+        "Could not warmup connection", status, res
+    )))
+}
+
 #[derive(Serialize)]
 pub enum HashAlgo {
     #[serde(rename(serialize = "sha256"))]

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [v0.2.0] - 2026-01-08
+
+### Changed
+- `Bot` struct now seperates between `base_url` and `signing_url` to allow customization of which AWS region is used for signing transactions. By default, the `signing_url` is set to the `base_url`
+- When `signing_url` and `base_url` differ, a `/health` call is done on successfull login to the `signing_url` to initiate a TLS connection and reduce cold start latency for the first signature
+
 ## [v0.1.9] - 2026-01-05
 
 ### Changed
