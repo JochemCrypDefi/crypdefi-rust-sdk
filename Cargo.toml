@@ -30,10 +30,6 @@ criterion = "0.5"
 name = "crypdefi_bot_sdk"
 path = "src/lib.rs"
 
-[[bin]]
-name = "crypdefi-bot"
-path = "src/bot.rs"
-
 
 
 [lints.rust]

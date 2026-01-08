@@ -4,4 +4,4 @@
 go-sdk/
 python-sdk/
 tls/
-src/bot.rs
+examples/
