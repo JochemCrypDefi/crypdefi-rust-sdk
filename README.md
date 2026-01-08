@@ -52,7 +52,13 @@ let wallet_id = "wa-0000000000-9f3542a65690ff697b85";
 // This is the bot's private key used to authenticate with CrypDefi (not the wallet's private key).
 let private_key_pem = fs::read_to_string("private_key_pkcs8.pem").expect("Failed to read private_key_pkcs8.pem");
 
-let bot = Bot::new(String::from(private_key_pem),user_id, None).unwrap();
+// [OPTIONAL] customize the main API endpoint for your deployment
+let base_url = String::from("https://api.release.crypdefi.eu");
+
+// [OPTIONAL] customize the signing API endpoint for your deployment
+let signing_url = String::from("https://sign.release.crypdefi.eu");
+
+let bot = Bot::new(String::from(private_key_pem), user_id, Some(base_url), Some(signing_url)).unwrap();
 println!("Bot: {:?}", bot);
 
 // --------------------------- LOGIN WITH BOT ---------------------------
