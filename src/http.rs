@@ -237,14 +237,14 @@ pub async fn sign(
     access_token: &str,
     wallet_id: &str,
     tx_type: SignatureRequestKind,
-    hex: &str,
+    hex: String,
     base_url: &str,
 ) -> Result<SigResponse, BotSdkError> {
     let url = set_url(base_url, &format!("/wallets/{wallet_id}/sign"));
 
     let req = SignRequest {
         kind: tx_type,
-        data: hex.to_owned(),
+        data: hex,
         raw_bytes: None,
     };
 

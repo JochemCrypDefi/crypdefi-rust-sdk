@@ -390,7 +390,7 @@ impl Bot {
         &self,
         wallet_id: &str,
         tx_type: SignatureRequestKind,
-        hex_value: &str,
+        hex_value: String,
     ) -> Result<SigResponse, BotSdkError> {
         let shared_access_lock = self.shared_value.read().await;
 
