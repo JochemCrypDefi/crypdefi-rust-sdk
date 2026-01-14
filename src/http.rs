@@ -16,7 +16,6 @@ pub enum AuthMethod {
 }
 #[derive(Serialize)]
 pub struct LoginRequest {
-    pub organization: String,
     pub user_id: String,
     pub auth_method: String,
 }
@@ -24,6 +23,8 @@ pub struct LoginRequest {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LoginResponse {
     pub challenge: String,
+    pub nonce: String,
+    pub timestamp: i64,
     pub deadline: usize,
 }
 
@@ -148,21 +149,12 @@ pub struct Wallet {
 /// makes call to get wallets from backend for user.
 pub async fn get_wallets(
     client: &reqwest::Client,
-    access_token_arc: &Option<String>,
+    access_token: &str,
     base_url: &str,
 ) -> Result<Vec<Wallet>, BotSdkError> {
-    let access_token = match access_token_arc {
-        Some(acc) => acc,
-        None => return Err(BotSdkError::NoAccessToken),
-    };
-
     let url = set_url(base_url, "/wallets?accessOnly=true");
 
-    let response = client
-        .get(url)
-        .bearer_auth(access_token.clone())
-        .send()
-        .await?;
+    let response = client.get(url).bearer_auth(access_token).send().await?;
 
     if response.status().is_success() {
         let res = response.json::<Vec<Wallet>>().await?;
@@ -202,7 +194,7 @@ impl Signature {
         const_hex::decode_to_slice(&self.s, &mut data[32..])?;
 
         let sig = ecdsa::Signature::from_compact(&data)?;
-        return Ok(sig.serialize_der());
+        Ok(sig.serialize_der())
     }
 }
 
@@ -242,29 +234,24 @@ pub enum SignatureRequestKind {
 /// Request signature from keyvault passing hex transactions
 pub async fn sign(
     client: &reqwest::Client,
-    access_token_arc: &Option<String>,
-    wallet_id: String,
+    access_token: &str,
+    wallet_id: &str,
     tx_type: SignatureRequestKind,
-    hex: String,
+    hex: &str,
     base_url: &str,
 ) -> Result<SigResponse, BotSdkError> {
-    let access_token = match access_token_arc {
-        Some(acc) => acc,
-        None => return Err(BotSdkError::NoAccessToken),
-    };
-
     let url = set_url(base_url, &format!("/wallets/{wallet_id}/sign"));
 
     let req = SignRequest {
         kind: tx_type,
-        data: hex,
+        data: hex.to_owned(),
         raw_bytes: None,
     };
 
     let response = client
         .post(url)
         .json(&req)
-        .bearer_auth(access_token.clone())
+        .bearer_auth(access_token)
         .send()
         .await?;
 
@@ -285,21 +272,12 @@ pub async fn sign(
 /// Request signature from keyvault passing hex transactions
 pub async fn logout(
     client: &reqwest::Client,
-    access_token_arc: &Option<String>,
+    access_token: &str,
     base_url: &str,
 ) -> Result<(), BotSdkError> {
-    let access_token = match access_token_arc {
-        Some(acc) => acc,
-        None => return Err(BotSdkError::NoAccessToken),
-    };
-
     let url = set_url(base_url, "/auth/logout");
 
-    let response = client
-        .post(url)
-        .bearer_auth(access_token.clone())
-        .send()
-        .await?;
+    let response = client.post(url).bearer_auth(access_token).send().await?;
 
     if response.status().is_success() {
         return Ok(());
@@ -321,29 +299,20 @@ struct RefreshRequest {
 /// Make call to try to refresh the access token
 pub async fn refresh_auth(
     client: &reqwest::Client,
-    refresh_token_opt: &Option<String>,
-    access_token_opt: &Option<String>,
+    refresh_token: &str,
+    access_token: &str,
     base_url: &str,
 ) -> Result<CraResponse, BotSdkError> {
-    let access_token = match access_token_opt {
-        Some(acc) => acc,
-        None => return Err(BotSdkError::NoAccessToken),
-    };
-    let refresh_token = match refresh_token_opt.clone().to_owned() {
-        Some(acc) => acc,
-        None => return Err(BotSdkError::NoRefreshToken),
-    };
-
     let url = set_url(base_url, "/auth/refresh");
 
-    let req_body: RefreshRequest = RefreshRequest {
-        refresh_token: refresh_token.clone(),
+    let req_body = RefreshRequest {
+        refresh_token: refresh_token.to_owned(),
     };
 
     let response = client
         .post(url)
         .json(&req_body)
-        .bearer_auth(access_token.clone())
+        .bearer_auth(access_token)
         .send()
         .await?;
     if response.status().is_success() {

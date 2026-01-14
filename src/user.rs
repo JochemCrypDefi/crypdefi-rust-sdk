@@ -9,10 +9,26 @@ use crate::{
 use p256::ecdsa::{DerSignature, SigningKey, signature::Signer};
 use p256::ecdsa::{VerifyingKey, signature::Verifier};
 use pkcs8::{DecodePrivateKey, der::Encode};
+use sha3::{Digest, Sha3_512};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::task::AbortHandle;
+
+fn verify_login_challenge(
+    nonce: &str,
+    user_id: &str,
+    timestamp: i64,
+    challenge: &[u8],
+) -> Result<bool, BotSdkError> {
+    let mut nonce_bytes = const_hex::decode(nonce)?;
+    nonce_bytes.extend_from_slice(user_id.as_bytes());
+    nonce_bytes.extend_from_slice(&timestamp.to_be_bytes());
+
+    // Hash
+    let digest = Sha3_512::digest(&nonce_bytes);
+    Ok(challenge == digest.as_slice())
+}
 
 fn sign_challenge_with_ecdsa(
     signing_key: SigningKey,
@@ -76,14 +92,31 @@ async fn auto_refresh_task(
 
         let shared_values_lock = shared_values_rw.read().await;
 
-        match refresh_auth(
-            &client,
-            &shared_values_lock.refresh_token,
-            &shared_values_lock.access_token,
-            &base_url,
-        )
-        .await
+        let access_token = match shared_values_lock
+            .access_token
+            .as_deref()
+            .ok_or(BotSdkError::NoAccessToken)
         {
+            Ok(a) => a,
+            Err(e) => {
+                log::error!("Failed to refresh token: {e:?}");
+                return;
+            }
+        };
+
+        let refresh_token = match shared_values_lock
+            .refresh_token
+            .as_deref()
+            .ok_or(BotSdkError::NoRefreshToken)
+        {
+            Ok(a) => a,
+            Err(e) => {
+                log::error!("Failed to refresh token: {e:?}");
+                return;
+            }
+        };
+
+        match refresh_auth(&client, refresh_token, access_token, &base_url).await {
             Ok(response) => {
                 drop(shared_values_lock);
                 let mut shared_values_write_lock = shared_values_rw.write().await;
@@ -190,7 +223,6 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub async fn login(&mut self, auto_refresh: bool) -> Result<(), BotSdkError> {
         let login_req = LoginRequest {
-            organization: self.user_id.organization().to_string(),
             user_id: self.user_id.full_id().to_string(),
             auth_method: "cra".to_string(),
         };
@@ -198,6 +230,15 @@ impl Bot {
         let response = login(&self.rest_client, login_req, &self.base_url).await?;
 
         let challenge_bytes = const_hex::decode(response.challenge.clone())?;
+        let is_valid_challenge = verify_login_challenge(
+            &response.nonce,
+            self.user_id.full_id(),
+            response.timestamp,
+            challenge_bytes.as_slice(),
+        )?;
+        if !is_valid_challenge {
+            return Err(BotSdkError::Custom("invalid login challenge".to_string()));
+        }
 
         let signed_challenge =
             sign_challenge_with_ecdsa(self.private_cert.clone(), challenge_bytes)?;
@@ -254,10 +295,29 @@ impl Bot {
     pub async fn refresh(&mut self, auto_refresh: bool) -> Result<(), BotSdkError> {
         self.cancel_refresh_task();
         let shared_lock = self.shared_value.read().await;
+
+        let access_token = match shared_lock
+            .access_token
+            .as_deref()
+            .ok_or(BotSdkError::NoAccessToken)
+        {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+
+        let refresh_token = match shared_lock
+            .refresh_token
+            .as_deref()
+            .ok_or(BotSdkError::NoRefreshToken)
+        {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
+
         let response = refresh_auth(
             &self.rest_client,
-            &shared_lock.refresh_token,
-            &shared_lock.access_token,
+            refresh_token,
+            access_token,
             &self.base_url,
         )
         .await?;
@@ -295,14 +355,16 @@ impl Bot {
     /// # Note: uses tokio async runtime
     pub async fn get_wallets(&self) -> Result<Vec<Wallet>, BotSdkError> {
         let shared_access_lock = self.shared_value.read().await;
-        let wallets = get_wallets(
-            &self.rest_client,
-            &shared_access_lock.access_token,
-            &self.base_url,
-        )
-        .await?;
+        let access_token = match shared_access_lock
+            .access_token
+            .as_deref()
+            .ok_or(BotSdkError::NoAccessToken)
+        {
+            Ok(a) => a,
+            Err(e) => return Err(e),
+        };
 
-        Ok(wallets)
+        get_wallets(&self.rest_client, access_token, &self.base_url).await
     }
 
     /// Signs a transaction (hex-encoded) using the specified wallet and signature request kind. The bot must have access to the wallet in the CrypDefi management UI.
@@ -326,15 +388,26 @@ impl Bot {
     /// ```
     pub async fn sign_transaction(
         &self,
-        wallet_id: String,
+        wallet_id: &str,
         tx_type: SignatureRequestKind,
-        hex_value: String,
+        hex_value: &str,
     ) -> Result<SigResponse, BotSdkError> {
         let shared_access_lock = self.shared_value.read().await;
 
+        let access_token = match shared_access_lock
+            .access_token
+            .as_deref()
+            .ok_or(BotSdkError::NoAccessToken)
+        {
+            Ok(a) => a,
+            Err(e) => {
+                return Err(e);
+            }
+        };
+
         sign(
             &self.rest_client,
-            &shared_access_lock.access_token,
+            access_token,
             wallet_id,
             tx_type,
             hex_value,
@@ -363,12 +436,19 @@ impl Bot {
     pub async fn logout(&mut self) -> Result<(), BotSdkError> {
         self.cancel_refresh_task();
         let shared_access_lock = self.shared_value.read().await;
-        logout(
-            &self.rest_client,
-            &shared_access_lock.access_token,
-            &self.base_url,
-        )
-        .await?;
+
+        let access_token = match shared_access_lock
+            .access_token
+            .as_deref()
+            .ok_or(BotSdkError::NoAccessToken)
+        {
+            Ok(a) => a,
+            Err(e) => {
+                return Err(e);
+            }
+        };
+
+        logout(&self.rest_client, access_token, &self.base_url).await?;
         drop(shared_access_lock);
 
         let mut shared_value_lock = self.shared_value.write().await;

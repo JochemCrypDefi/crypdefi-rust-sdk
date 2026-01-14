@@ -1,6 +1,6 @@
 [package]
 name = "crypdefi-bot-sdk"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 exclude = [
     "python-sdk",
@@ -23,6 +23,7 @@ log = "0.4.27"
 secp256k1 = "0.31.1"
 const-hex = "1.14.1"
 tracing = "0.1"
+sha3 = "0.10"
 
 [dev-dependencies]
 criterion = "0.5"
