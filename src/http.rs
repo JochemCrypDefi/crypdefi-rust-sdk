@@ -229,6 +229,7 @@ pub enum SignatureRequestKind {
     Message,
     RdxAuthenticationRequest,
     EvmEip712,
+    CantonTopology,
 }
 
 /// Request signature from keyvault passing hex transactions
