@@ -9,9 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Add verification of login challenge to the login flow
+- Add `CantonTopology` variant to `SignatureRequestKind`
 
 ### Changed
 - Reduced the usage of owned `String` in favor of borrowed `&str` in the `Bot` public functions and internal functions
+
+### Fixed
+- Clarified the auto-refresh task log messages when the access or refresh token is missing
+- Removed an unnecessary clone of the login challenge before hex decoding
+- Corrected the signature buffer initialization in `Signature::to_der`
 
 ## [v0.2.0] - 2026-01-08
 
