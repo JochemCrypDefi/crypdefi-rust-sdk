@@ -99,7 +99,7 @@ async fn auto_refresh_task(
         {
             Ok(a) => a,
             Err(e) => {
-                log::error!("Failed to refresh token: {e:?}");
+                log::error!("Stopping auto-refresh task, no access token available: {e:?}");
                 return;
             }
         };
@@ -111,7 +111,7 @@ async fn auto_refresh_task(
         {
             Ok(a) => a,
             Err(e) => {
-                log::error!("Failed to refresh token: {e:?}");
+                log::error!("Stopping auto-refresh task, no refresh token available: {e:?}");
                 return;
             }
         };
@@ -229,7 +229,7 @@ impl Bot {
 
         let response = login(&self.rest_client, login_req, &self.base_url).await?;
 
-        let challenge_bytes = const_hex::decode(response.challenge.clone())?;
+        let challenge_bytes = const_hex::decode(&response.challenge)?;
         let is_valid_challenge = verify_login_challenge(
             &response.nonce,
             self.user_id.full_id(),

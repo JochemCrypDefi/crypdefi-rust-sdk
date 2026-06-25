@@ -189,7 +189,7 @@ pub struct Signature {
 
 impl Signature {
     pub fn to_der(&self) -> Result<SerializedSignature, BotSdkError> {
-        let mut data = [8u8; 64];
+        let mut data = [0u8; 64];
         const_hex::decode_to_slice(&self.r, &mut data[..32])?;
         const_hex::decode_to_slice(&self.s, &mut data[32..])?;
 
